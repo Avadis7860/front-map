@@ -30,22 +30,31 @@ sans dépendre de code-map ni de tree-sitter.
 
 Deux outils, deux vocabulaires de requête, deux évolutions → deux repos.
 
+**Générique par convention (comme code-map est multi-langage).** code-map varie par *langage* via des
+*engines* ; front-map varie par *convention* via des **adaptateurs** (`src/frontmap/adapters/`) sur deux
+axes ORTHOGONAUX — **router** (`tanstack` | `react-router`) et **primitives** (`barrel` | `dir-scan`).
+Même patron que `engines/` de code-map : un `Protocol` par axe (`base.py`) + un schéma de ligne JSONL
+**figé** que les adaptateurs remplissent + un registre (`__init__.py`) + une détection par signatures de
+fichiers. La convention est auto-détectée ou forcée dans `.frontmap.toml`. Ajouter une convention = un
+adaptateur de plus, rien d'autre ne bouge.
+
 ## Couches
 
 ```
-cli.py ──────────► build.py ──────► extractors/{tokens,primitives,routes,usage}.py ──► *.jsonl (index)
-   │                  ▲                         │
-   │ (build écrit)    │ fraîcheur par hash      │ tokens : CSS pur (stdlib)
-   │                  │ (frontmap.manifest.json)│ primitives/routes : tsparse.py (tree-sitter, best-effort)
-   └── query.py ──────┴─────────────────────────┘  usage : imports+tokens en regex (pur-Python)
-                                                    (query LIT seulement)
+cli.py ─► build.py ─► adapters.resolve_{router,primitives}(cfg) ─┐
+   │          ▲            (auto-détection ou override)           ├─► *.jsonl (index)
+   │(écrit)   │ fraîcheur   extractors/tokens.py (CSS pur)        │
+   │          │ par hash    extractors/usage.py (regex, délègue   │
+   └─query.py─┘ (manifest)   la conso à l'adaptateur primitives)  ┘   (query LIT seulement)
+
+adapters/  base.py (Protocols + schéma figé) · __init__.py (registres + detect/resolve)
+           router_{tanstack,react}.py · primitives_{barrel,dirscan}.py · tsx_component.py (détail partagé)
 ```
 
-- **`build`** est la SEULE couche qui exécute les extracteurs et matérialise les index. Idempotent : si
-  les hash des sources **et** la disponibilité de tree-sitter sont inchangés → skip.
-- **`query`** ne fait que lire les JSONL. Aucune exécution lourde dans une requête (invariant jumeau de
-  code-map `query.py`).
-- **`tsparse`** centralise le parser tree-sitter (lazy, dégradation gracieuse) partagé par primitives+routes.
+- **`build`** résout les adaptateurs (par convention), exécute les extracteurs, matérialise les index.
+  Idempotent : skip si hash des sources **et** dispo tree-sitter **et** convention retenue inchangés.
+- **`query`** ne fait que lire les JSONL. Aucune exécution lourde dans une requête (invariant code-map).
+- **`tsparse`** centralise le parser tree-sitter (lazy, dégradation gracieuse), partagé par les adaptateurs.
 
 ## Schéma des index (contrat)
 
@@ -53,28 +62,36 @@ cli.py ──────────► build.py ──────► extracto
   surface · radius · shadow · motion · typography · z · other`, dérivé du préfixe du nom.
 - **`primitives.jsonl`** — `{name, file, line, props:[{name,type,optional}], variants:{prop:[valeurs]},
   defaults:{prop:valeur}, lead}`. `variants` = props dont le type est une union de littéraux string.
-- **`routes.jsonl`** — `{var, path, full_path, component, parent, is_root, file, line}`. `full_path`
-  reconstruit en chaînant les `getParentRoute`.
+- **`routes.jsonl`** — `{var, path, full_path, component, parent, is_root, file, line}`. Rempli par
+  l'adaptateur router (tanstack : chaînage `getParentRoute` ; react-router : imbrication JSX `<Route>`).
 - **`usage.jsonl`** — `{consumer, kind:page|component, primitives:[…], tokens:[…], route}`. Un fichier par
   consommateur du DS (fichier sans aucune primitive/token connu → omis). `primitives` = primitives connues
-  importées du barrel ; `tokens` = tokens connus référencés littéralement (`var(--…)`, best-effort — pas la
+  consommées, la détection étant **déléguée à l'adaptateur** (barrel : import nommé ; dir-scan : import par
+  défaut d'un fichier) ; `tokens` = tokens connus référencés littéralement (`var(--…)`, best-effort — pas la
   forme utilitaire Tailwind) ; `route` = `full_path` si le fichier est le composant d'une route, sinon `null`.
-- **`frontmap.manifest.json`** — `{contract_version, ts_available, counts, file_hashes}`. Base de la
-  fraîcheur (hash de contenu ; la signature `ts_available` invalide la réutilisation quand tree-sitter
-  apparaît/disparaît).
+- **`frontmap.manifest.json`** — `{contract_version, ts_available, conventions:{router,primitives}, counts,
+  file_hashes}`. Base de la fraîcheur (hash de contenu ; les signatures `ts_available` **et** `conventions`
+  invalident la réutilisation quand tree-sitter ou la convention retenue changent).
 
-## Détection par convention
+## Détection par convention (deux axes)
 
-Aucune config obligatoire : les trois sources ont des défauts calés sur les conventions cockpit
-(`web/src/index.css`, `web/src/components/ui/index.ts`, `web/src/router.tsx`), surchargeables via
-`.frontmap.toml` à la racine du repo cible. L'**autorité** de la liste des primitives est le **barrel**
-(ses exports de valeur), pas un scan de dossier — un composant hors barrel n'est pas une primitive.
+Aucune config obligatoire : les sources ont des défauts cockpit, et la **convention** de chaque axe est
+auto-détectée (`.frontmap.toml` peut forcer via `[conventions] router / primitives`) :
+- **router** — sniff des imports du `router_file` : `@tanstack/react-router` → `tanstack` ; `react-router`
+  → `react-router` ; défaut `tanstack`.
+- **primitives** — `barrel` si `primitives_barrel` existe ; sinon `dir-scan` si `primitives_dir` contient des
+  `.tsx` ; défaut `barrel`. En `barrel` l'autorité est le barrel (ses exports de valeur) ; en `dir-scan`
+  c'est le dossier (un `.tsx` = une primitive, `export default`, nom = stem du fichier).
+
+La convention retenue est **tracée au manifest** et exposée par `frontmap detect` / `frontmap check` — jamais
+devinée en silence. Prouvé sur deux projets réels opposés (cockpit TanStack+barrel, aggregator
+react-router+dir-scan).
 
 ## Dégradation gracieuse
 
-tree-sitter absent → `primitives`/`routes` vides (jamais d'exception) ; `tokens` (CSS pur) reste produit.
-`usage` reste produit lui aussi (pur-Python : primitives via le barrel-regex, tokens via scan littéral) —
-seul son `route` se dégrade à `null` (routes vide). `check` **signale** l'absence de tree-sitter, la
-péremption de l'index (pas de faux-vert silencieux) et, en `signals` (sans invalider `ok`), les primitives
-déclarées mais **jamais consommées** — front-map *signale*, il ne juge pas (le verdict est l'affaire du
-futur agent UX-critic).
+tree-sitter absent → catalogue `primitives`/`routes` vide (jamais d'exception) ; `tokens` (CSS pur) reste
+produit. `usage` reste produit lui aussi (pur-Python : **noms** de primitives via l'adaptateur — regex/
+filesystem, sans tree-sitter — tokens via scan littéral) — seul son `route` se dégrade à `null`. `check`
+**signale** (sans invalider `ok` pour les signaux) : absence de tree-sitter, index périmé, **routes
+dynamiques** non résolues par l'adaptateur router (`.map`), primitives déclarées mais **jamais consommées**.
+front-map *signale*, il ne juge pas (le verdict est l'affaire du futur agent UX-critic).

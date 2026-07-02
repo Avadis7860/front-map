@@ -1,7 +1,7 @@
-"""usage — index inverse : primitives importées du barrel + tokens littéraux + lien route.
+"""usage — index inverse : primitives importées + tokens littéraux + lien route.
 
-Le cœur (primitives + tokens) est PUR-Python (regex) → testé sans skipif. Seul le lien route dépend de
-`routes` (tree-sitter) → son test est gardé.
+Le cœur (primitives + tokens) est PUR-Python (regex/filesystem) → testé sans skipif. Seul le lien route
+dépend de tree-sitter → son test est gardé.
 """
 from __future__ import annotations
 
@@ -9,15 +9,18 @@ import pytest
 
 from conftest import FIXTURES
 from frontmap import tsparse
-from frontmap.extractors import primitives, routes, tokens, usage
+from frontmap.adapters.primitives_barrel import BarrelPrimitives
+from frontmap.adapters.router_tanstack import TanstackRouter
+from frontmap.extractors import tokens, usage
 
 
 def _rows(cfg):
-    prim_names = primitives.primitive_names(FIXTURES, cfg.primitives_barrel)
+    prim = BarrelPrimitives()
+    prim_names = prim.primitive_names(FIXTURES, cfg)
     tok_names = {t["name"] for t in tokens.extract_tokens(
         (FIXTURES / cfg.tokens_file).read_text(encoding="utf-8"), cfg.tokens_file)}
-    rts = routes.extract_routes(FIXTURES, cfg.router_file)
-    return {r["consumer"]: r for r in usage.extract_usage(FIXTURES, cfg, prim_names, tok_names, rts)}
+    rts = TanstackRouter().extract_routes(FIXTURES, cfg)
+    return {r["consumer"]: r for r in usage.extract_usage(FIXTURES, cfg, prim, prim_names, tok_names, rts)}
 
 
 def test_primitive_usage_from_barrel_imports(cfg):

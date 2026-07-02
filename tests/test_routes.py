@@ -1,17 +1,18 @@
-"""routes — extraction de l'arbre TanStack (full_path chaîné). Requiert tree-sitter."""
+"""routes — adaptateur TanStack (full_path chaîné). Requiert tree-sitter."""
 from __future__ import annotations
 
 import pytest
 
-from conftest import FIXTURES, ROUTER
+from conftest import FIXTURES
 from frontmap import tsparse
-from frontmap.extractors import routes
+from frontmap.adapters.router_tanstack import TanstackRouter
+from frontmap.config import Config
 
 pytestmark = pytest.mark.skipif(not tsparse.available(), reason="tree-sitter absent (extra [ts])")
 
 
 def _by_var():
-    return {r["var"]: r for r in routes.extract_routes(FIXTURES, ROUTER)}
+    return {r["var"]: r for r in TanstackRouter().extract_routes(FIXTURES, Config())}
 
 
 def test_full_path_chained_via_parents():

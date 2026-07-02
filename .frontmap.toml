@@ -1,7 +1,8 @@
 # .frontmap.toml — configuration d'un repo cible (échantillon commenté / valeurs = défauts).
 #
 # Ce fichier vit à la RACINE du repo dont front-map indexe le design-system. Sans lui, front-map
-# applique les conventions cockpit (web/ Vite+React). Les flags CLI (`--root`) le complètent.
+# applique les conventions cockpit (web/ Vite+React) ET auto-détecte les conventions router/primitives.
+# Les flags CLI (`--root`) le complètent.
 #
 # NB : ce repo-ci (front-map, un outil Python) n'a pas de web/ à indexer — ce fichier sert d'exemple
 # et de repère de racine (roots.project_root). L'usage réel est de le poser dans un repo front cible.
@@ -10,8 +11,19 @@
 # Fichier des design tokens (bloc @theme + :root). Parse CSS pur, toujours disponible.
 tokens = "web/src/index.css"
 
-# Barrel des primitives partagées : ses exports de valeur = la liste canonique des primitives.
+# Convention `barrel` : ses exports de valeur = la liste canonique des primitives.
 primitives_barrel = "web/src/components/ui/index.ts"
+# Convention `dir-scan` : dossier scanné (un `.tsx` par primitive, sans barrel).
+primitives_dir = "web/src/components/ui"
 
-# Définition des routes (TanStack Router code-based).
+# Définition des routes (TanStack `router.tsx`, ou le fichier JSX react-router — ex. "web/src/App.tsx").
 router = "web/src/router.tsx"
+
+# Racine des consommateurs + alias d'import local (→ web_root).
+web_root = "web/src"
+alias = "@/"
+
+[conventions]
+# "auto" (défaut) = détection depuis le code. Forcer si l'auto-détection se trompe.
+router = "auto"       # auto | tanstack | react-router
+primitives = "auto"   # auto | barrel | dir-scan

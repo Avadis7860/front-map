@@ -1,17 +1,18 @@
-"""primitives — extraction TSX (props, variantes, defaults). Requiert tree-sitter."""
+"""primitives — adaptateur barrel (props, variantes, defaults via TSX). Requiert tree-sitter."""
 from __future__ import annotations
 
 import pytest
 
-from conftest import BARREL, FIXTURES
+from conftest import FIXTURES
 from frontmap import tsparse
-from frontmap.extractors import primitives
+from frontmap.adapters.primitives_barrel import BarrelPrimitives
+from frontmap.config import Config
 
 pytestmark = pytest.mark.skipif(not tsparse.available(), reason="tree-sitter absent (extra [ts])")
 
 
 def _by_name():
-    return {p["name"]: p for p in primitives.extract_primitives(FIXTURES, BARREL)}
+    return {p["name"]: p for p in BarrelPrimitives().extract_primitives(FIXTURES, Config())}
 
 
 def test_barrel_is_authority_for_primitive_list():

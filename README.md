@@ -19,6 +19,15 @@ Frontière : front-map **vendorise le moteur *public* `tree-sitter`** (même ext
 et une copie du socle stdlib `core/` ; il **ne dépend pas** de code-map à l'exécution et **ne re-duplique
 pas** son extracteur général de symboles — ses quatre extracteurs sont étroits et DS-sémantiques.
 
+**Générique par convention (comme code-map est multi-langage).** Là où code-map varie par *langage* via
+des *engines*, front-map varie par *convention* via des **adaptateurs** sur deux axes orthogonaux :
+- **router** : `tanstack` (TanStack code-based `createRoute`) · `react-router` (JSX `<Route>`) ;
+- **primitives** : `barrel` (`components/ui/index.ts` ré-exporte) · `dir-scan` (un `.tsx` par primitive, sans barrel).
+
+La convention est **auto-détectée** (sniff des imports du router, présence d'un barrel) — ou forcée dans
+`.frontmap.toml`. Un axe inconnu dégrade gracieusement et le signale ; ajouter une convention = un nouvel
+adaptateur dans le registre (`src/frontmap/adapters/`), rien d'autre ne bouge.
+
 ## Verbes
 
 | Verbe | Rôle |
@@ -31,19 +40,21 @@ pas** son extracteur général de symboles — ses quatre extracteurs sont étro
 | `frontmap where <intention>` | « quelle primitive / quel token pour X ? » (ranking lexical borné) |
 | `frontmap usage <name>` | index **inversé** : « qui consomme cette primitive / ce token ? » |
 | `frontmap consumers <file>` | ce qu'un écran consomme : primitives + tokens + route |
-| `frontmap check` | cohérence + fraîcheur + signaux (primitives jamais consommées) |
+| `frontmap detect` | conventions auto-détectées du repo (router / primitives) |
+| `frontmap check` | cohérence + fraîcheur + signaux (routes dynamiques, primitives jamais consommées) |
 
 ## Les quatre index
 
 - **`tokens.jsonl`** — `{name, value, group, source_file, line}` depuis le CSS (`@theme` + `:root`).
   **CSS pur, toujours disponible** (aucune dépendance).
-- **`primitives.jsonl`** — `{name, file, line, props, variants, defaults, lead}` depuis le barrel des
-  primitives + chaque `.tsx`. Requiert `tree-sitter` (extra `[ts]`).
-- **`routes.jsonl`** — `{var, path, full_path, component, parent, file, line}` depuis le router.
-  Requiert `tree-sitter`.
+- **`primitives.jsonl`** — `{name, file, line, props, variants, defaults, lead}` depuis l'adaptateur
+  primitives résolu (barrel **ou** dir-scan). Le catalogue **riche** requiert `tree-sitter` (extra `[ts]`) ;
+  les **noms** (contrat pivot pour `usage`) sont extraits sans (regex/filesystem).
+- **`routes.jsonl`** — `{var, path, full_path, component, parent, is_root, file, line}` depuis l'adaptateur
+  router résolu (tanstack **ou** react-router). Requiert `tree-sitter`.
 - **`usage.jsonl`** — `{consumer, kind, primitives, tokens, route}` : index **inverse** de consommation
-  (qui importe quelle primitive du barrel, quels tokens littéraux, sous quelle route). **Pur-Python** —
-  marche sans `tree-sitter` (seul le lien `route` se dégrade à `null`).
+  (qui importe quelle primitive, quels tokens littéraux, sous quelle route). **Pur-Python** — marche sans
+  `tree-sitter` (seul le lien `route` se dégrade à `null`).
 
 ## Principes
 
@@ -54,8 +65,10 @@ pas** son extracteur général de symboles — ses quatre extracteurs sont étro
   que lire. Aucune exécution lourde dans une requête.
 - **Fraîcheur par hash de contenu** (jamais mtime) : index incrémental, skip idempotent si les sources
   n'ont pas bougé. Déterministe cross-OS (newlines normalisées).
-- **Générique par configuration** : les trois sources se déclarent dans un
-  [`.frontmap.toml`](./.frontmap.toml) à la racine du repo cible (défauts = conventions cockpit).
+- **Générique par convention** : sources + axes (router / primitives) se déclarent dans un
+  [`.frontmap.toml`](./.frontmap.toml) à la racine du repo cible (défauts = conventions cockpit,
+  convention auto-détectée). Prouvé sur deux projets réels aux conventions opposées (cockpit TanStack+barrel,
+  aggregator react-router+dir-scan).
 
 ## Installation
 

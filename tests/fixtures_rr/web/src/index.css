@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Couleurs */
+@theme {
+  --color-accent-500: #3b82f6;
+  --color-danger-500: #ef4444;
+}

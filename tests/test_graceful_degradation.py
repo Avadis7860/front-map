@@ -1,10 +1,12 @@
-"""dégradation gracieuse — tree-sitter absent : primitives/routes vides, tokens OK, jamais d'exception."""
+"""dégradation gracieuse — tree-sitter absent : primitives/routes vides, tokens+usage OK, sans exception."""
 from __future__ import annotations
 
-from conftest import BARREL, FIXTURES, ROUTER
+from conftest import FIXTURES
 from frontmap import query, tsparse
+from frontmap.adapters.primitives_barrel import BarrelPrimitives
+from frontmap.adapters.router_tanstack import TanstackRouter
 from frontmap.build import build
-from frontmap.extractors import primitives, routes
+from frontmap.config import Config
 
 
 def _force_no_treesitter(monkeypatch):
@@ -15,8 +17,8 @@ def _force_no_treesitter(monkeypatch):
 
 def test_primitives_and_routes_empty_without_treesitter(monkeypatch):
     _force_no_treesitter(monkeypatch)
-    assert primitives.extract_primitives(FIXTURES, BARREL) == []
-    assert routes.extract_routes(FIXTURES, ROUTER) == []
+    assert BarrelPrimitives().extract_primitives(FIXTURES, Config()) == []
+    assert TanstackRouter().extract_routes(FIXTURES, Config()) == []
 
 
 def test_build_still_produces_tokens_and_check_flags_absence(tmp_path, cfg, monkeypatch):

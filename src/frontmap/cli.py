@@ -4,7 +4,7 @@ Une commande, des sous-commandes, un `--root`, un `.frontmap.toml`. `build` écr
 verbes lisent. Sortie JSON stable (chaque verbe renvoie un dict + `engine`) → consommable par un agent.
 
 Sous-commandes :
-  build                    (re)construit les 3 index (tokens + primitives + routes), incrémental par hash
+  build                    (re)construit les 4 index (tokens/primitives/routes/usage), incrémental par hash
   tokens [--group G]       design tokens (filtre optionnel par groupe)
   primitives               catalogue des primitives (résumé)
   primitive <name>         détail d'une primitive (props, variantes, defaults)
@@ -12,6 +12,7 @@ Sous-commandes :
   where <intention>        « quelle primitive / quel token pour X ? » (ranking lexical borné)
   usage <name>             « qui consomme cette primitive / ce token ? » (index inversé)
   consumers <file>         ce qu'un écran consomme (primitives + tokens + route)
+  detect                   conventions (router / primitives) auto-détectées du repo
   check                    cohérence + fraîcheur de l'index
 """
 from __future__ import annotations
@@ -84,6 +85,12 @@ def _cmd_consumers(a: argparse.Namespace) -> int:
     return _emit(query.consumers(index_dir, a.file))
 
 
+def _cmd_detect(a: argparse.Namespace) -> int:
+    from frontmap import adapters
+    root, _, cfg = _resolve(a.root)
+    return _emit({**adapters.detect(root, cfg), "engine": "frontmap-v1"})
+
+
 def _cmd_check(a: argparse.Namespace) -> int:
     from frontmap import query
     root, index_dir, cfg = _resolve(a.root)
@@ -129,6 +136,9 @@ def build_parser() -> argparse.ArgumentParser:
     cn = sub.add_parser("consumers", parents=[common], help="ce qu'un écran consomme")
     cn.add_argument("file")
     cn.set_defaults(func=_cmd_consumers)
+
+    dt = sub.add_parser("detect", parents=[common], help="conventions auto-détectées (router / primitives)")
+    dt.set_defaults(func=_cmd_detect)
 
     c = sub.add_parser("check", parents=[common], help="cohérence + fraîcheur de l'index")
     c.set_defaults(func=_cmd_check)

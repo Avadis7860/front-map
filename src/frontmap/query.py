@@ -10,7 +10,7 @@ Jumeau de `code-map/query.py` (D7 : `build` d'abord, `query` lit). Chaque verbe 
   where <intention>   → ranking lexical sur primitives + tokens (« quelle primitive/token pour X ? »)
   usage <name>        → usage.jsonl inversé (« qui consomme cette primitive/ce token ? »)
   consumers <file>    → usage.jsonl (ce qu'un écran consomme : primitives + tokens + route)
-  check               → cohérence + fraîcheur (barrel↔fichiers, index périmé, tree-sitter, primitives mortes)
+  check               → cohérence + fraîcheur (convention résolue, source primitives, index périmé, signaux)
 """
 from __future__ import annotations
 
@@ -18,12 +18,12 @@ import json
 from pathlib import Path
 
 from frontmap import tsparse
+from frontmap.adapters import resolve_primitives, resolve_router
 from frontmap.build import MANIFEST_NAME, source_files
 from frontmap.config import Config
 from frontmap.core.hashing import sha_text
 from frontmap.core.jsonl import read_jsonl
 from frontmap.core.text import score, tokenize
-from frontmap.extractors import primitives as prim_ext
 
 ENGINE = "frontmap-v1"
 
@@ -107,8 +107,13 @@ def consumers(index_dir: Path, file: str) -> dict:
 
 
 def check(index_dir: Path, root: Path, cfg: Config) -> dict:
-    """Cohérence/fraîcheur : tree-sitter présent, index frais (hash), barrel↔.tsx résolus."""
+    """Cohérence/fraîcheur : tree-sitter présent, index frais (hash), source de primitives résolue.
+
+    Générique par convention : la source des primitives (barrel OU dossier) et sa complétude sont vérifiées
+    via l'adaptateur résolu ; les limites du router (routes dynamiques) remontent en `signals`."""
     index_dir, root = Path(index_dir), Path(root)
+    router = resolve_router(root, cfg)
+    prim = resolve_primitives(root, cfg)
     man_path = index_dir / MANIFEST_NAME
     findings: list[str] = []
     ok = True
@@ -119,7 +124,8 @@ def check(index_dir: Path, root: Path, cfg: Config) -> dict:
 
     if not man_path.is_file():
         return {"ok": False, "ts_available": ts_ok, "fresh": False,
-                "findings": ["index absent — lancer `frontmap build`"], "engine": ENGINE}
+                "conventions": {"router": router.name, "primitives": prim.name},
+                "findings": ["index absent — lancer `frontmap build`"], "signals": [], "engine": ENGINE}
 
     try:
         manifest = json.loads(man_path.read_text(encoding="utf-8"))
@@ -127,28 +133,23 @@ def check(index_dir: Path, root: Path, cfg: Config) -> dict:
         manifest = {}
     cur = {f: sha_text((root / f).read_text(encoding="utf-8", errors="replace"))
            for f in source_files(root, cfg)}
-    fresh = manifest.get("file_hashes") == cur and manifest.get("ts_available") == ts_ok
+    fresh = (manifest.get("file_hashes") == cur and manifest.get("ts_available") == ts_ok
+             and manifest.get("conventions") == {"router": router.name, "primitives": prim.name})
     if not fresh:
         ok = False
-        findings.append("index périmé (sources modifiées ou dispo tree-sitter changée) — rebuild")
+        findings.append("index périmé (sources, dispo tree-sitter ou convention changée) — rebuild")
 
-    # barrel ↔ .tsx : primitives déclarées mais fichier absent
-    bpath = root / cfg.primitives_barrel
-    if bpath.is_file():
-        declared = prim_ext.parse_barrel(bpath.read_text(encoding="utf-8"))
-        referenced = set(prim_ext.referenced_files(root, cfg.primitives_barrel))
-        for entry in declared:
-            tsx = prim_ext.resolve_tsx(cfg.primitives_barrel, entry["module"])
-            if tsx not in referenced:
-                ok = False
-                findings.append(f"primitive « {entry['name']} » : fichier introuvable ({tsx})")
-    else:
+    # source des primitives résolue + complète (barrel↔.tsx pour la convention barrel ; toujours OK pour
+    # dir-scan où la source EST le fichier)
+    if not prim.available(root, cfg):
         ok = False
-        findings.append(f"barrel de primitives introuvable : {cfg.primitives_barrel}")
+        findings.append(f"source de primitives ({prim.name}) introuvable")
+    for miss in prim.missing_files(root, cfg):
+        ok = False
+        findings.append(f"primitive « {miss} » : fichier introuvable")
 
-    # SIGNAUX (n'invalident pas `ok`) : primitives déclarées mais jamais consommées (candidates au retrait,
-    # ou juste neuves). front-map SIGNALE — il ne juge pas (le verdict est l'affaire du futur agent UX).
-    signals: list[str] = []
+    # SIGNAUX (n'invalident pas `ok`) : front-map SIGNALE, il ne juge pas (verdict = futur agent UX).
+    signals: list[str] = list(router.signals(root, cfg))  # ex. routes dynamiques non résolues
     prim_rows = _load(index_dir, "primitives.jsonl")
     usage_rows = _load(index_dir, "usage.jsonl")
     if prim_rows:
@@ -158,5 +159,6 @@ def check(index_dir: Path, root: Path, cfg: Config) -> dict:
             signals.append(f"primitives jamais consommées : {', '.join(dead)}")
 
     return {"ok": ok and fresh, "ts_available": ts_ok, "fresh": fresh,
+            "conventions": {"router": router.name, "primitives": prim.name},
             "counts": manifest.get("counts", {}), "findings": findings, "signals": signals,
             "engine": ENGINE}
