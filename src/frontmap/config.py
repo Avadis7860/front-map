@@ -21,6 +21,7 @@ class Config:
     tokens_file: str = "web/src/index.css"                      # source des tokens (@theme + :root)
     primitives_barrel: str = "web/src/components/ui/index.ts"   # barrel = liste canonique des primitives
     router_file: str = "web/src/router.tsx"                     # définition des routes (TanStack)
+    web_root: str = "web/src"                                   # racine scannée : consommateurs (usage)
 
     @staticmethod
     def load(root: Path) -> Config:
@@ -35,4 +36,5 @@ class Config:
             tokens_file=src.get("tokens", d.tokens_file),
             primitives_barrel=src.get("primitives_barrel", d.primitives_barrel),
             router_file=src.get("router", d.router_file),
+            web_root=src.get("web_root", d.web_root),
         )

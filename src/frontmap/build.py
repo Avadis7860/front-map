@@ -16,14 +16,17 @@ from frontmap import tsparse
 from frontmap.config import Config
 from frontmap.core.hashing import sha_text
 from frontmap.core.jsonl import write_jsonl
-from frontmap.extractors import primitives, routes, tokens
+from frontmap.extractors import primitives, routes, tokens, usage
 
 CONTRACT_VERSION = "frontmap-index-v1"
 MANIFEST_NAME = "frontmap.manifest.json"
 
 
 def source_files(root: Path, cfg: Config) -> list[str]:
-    """Fichiers sources consommés par les 3 extracteurs (dédup, ordre stable) — base du hash."""
+    """Fichiers sources consommés par les 4 extracteurs (dédup, ordre stable) — base du hash.
+
+    Inclut les fichiers CONSOMMATEURS (usage) : leur modification doit périmer l'index (sinon `usage`
+    resterait figé alors qu'un écran a changé de primitive)."""
     root = Path(root)
     files: list[str] = []
     if (root / cfg.tokens_file).is_file():
@@ -31,6 +34,7 @@ def source_files(root: Path, cfg: Config) -> list[str]:
     files.extend(primitives.referenced_files(root, cfg.primitives_barrel))
     if (root / cfg.router_file).is_file():
         files.append(cfg.router_file)
+    files.extend(usage.consumer_files(root, cfg))
     seen: set[str] = set()
     out: list[str] = []
     for f in files:
@@ -70,13 +74,20 @@ def build(root: Path, index_dir: Path, cfg: Config, *, force: bool = False) -> d
     tok = tokens.extract_tokens(_read(root, cfg.tokens_file), cfg.tokens_file)
     prim = primitives.extract_primitives(root, cfg.primitives_barrel)
     rts = routes.extract_routes(root, cfg.router_file)
+    # Vocabulaire connu pour l'index inverse. Noms de primitives via `parse_barrel` (regex) et NON via
+    # `prim` : sans tree-sitter `prim` est vide, mais la liste des primitives (le barrel) reste connue —
+    # `usage` doit rester exploitable sans l'extra `[ts]`.
+    usg = usage.extract_usage(root, cfg,
+                              primitives.primitive_names(root, cfg.primitives_barrel),
+                              {t["name"] for t in tok}, rts)
 
     index_dir.mkdir(parents=True, exist_ok=True)
     write_jsonl(index_dir / "tokens.jsonl", tok)
     write_jsonl(index_dir / "primitives.jsonl", prim)
     write_jsonl(index_dir / "routes.jsonl", rts)
+    write_jsonl(index_dir / "usage.jsonl", usg)
 
-    counts = {"tokens": len(tok), "primitives": len(prim), "routes": len(rts)}
+    counts = {"tokens": len(tok), "primitives": len(prim), "routes": len(rts), "usage": len(usg)}
     manifest = {
         "contract_version": CONTRACT_VERSION,
         "ts_available": ts_avail,

@@ -1,10 +1,10 @@
 # front-map
 
-> Index **design-system déterministe et interrogeable par un agent** (tokens · primitives · routes)
+> Index **design-system déterministe et interrogeable par un agent** (tokens · primitives · routes · usage)
 > — pour ancrer la génération d'UI sur un index plutôt que sur du code écrit en aveugle.
 
 **Statut : privé · v1.** Outil **autonome**, sans service ni réseau : un CLI déterministe qui lit le
-`web/` d'un projet et écrit trois index JSONL. Conçu pour être **injecté dans chaque projet géré** par le
+`web/` d'un projet et écrit quatre index JSONL. Conçu pour être **injecté dans chaque projet géré** par le
 [`cockpit`](../cockpit) — un worker IA (ou un agent UX-critic) interroge la vérité du design-system **réel**
 avant d'écrire une vue, au lieu de réinventer un bouton ou de coder une couleur en dur.
 
@@ -17,21 +17,23 @@ quel token / quelle route pour X »** : il modélise ce que code-map ne fait pas
 
 Frontière : front-map **vendorise le moteur *public* `tree-sitter`** (même extra optionnel que code-map)
 et une copie du socle stdlib `core/` ; il **ne dépend pas** de code-map à l'exécution et **ne re-duplique
-pas** son extracteur général de symboles — ses trois extracteurs sont étroits et DS-sémantiques.
+pas** son extracteur général de symboles — ses quatre extracteurs sont étroits et DS-sémantiques.
 
 ## Verbes
 
 | Verbe | Rôle |
 |---|---|
-| `frontmap build [--root R]` | (re)construit les 3 index, incrémental par hash |
+| `frontmap build [--root R]` | (re)construit les 4 index, incrémental par hash |
 | `frontmap tokens [--group G]` | design tokens (filtre optionnel : accent/status/surface/radius/…) |
 | `frontmap primitives` | catalogue des primitives (résumé) |
 | `frontmap primitive <name>` | détail d'une primitive : props, variantes, defaults |
 | `frontmap routes` | arbre des routes (path → composant) |
 | `frontmap where <intention>` | « quelle primitive / quel token pour X ? » (ranking lexical borné) |
-| `frontmap check` | cohérence + fraîcheur de l'index |
+| `frontmap usage <name>` | index **inversé** : « qui consomme cette primitive / ce token ? » |
+| `frontmap consumers <file>` | ce qu'un écran consomme : primitives + tokens + route |
+| `frontmap check` | cohérence + fraîcheur + signaux (primitives jamais consommées) |
 
-## Les trois index
+## Les quatre index
 
 - **`tokens.jsonl`** — `{name, value, group, source_file, line}` depuis le CSS (`@theme` + `:root`).
   **CSS pur, toujours disponible** (aucune dépendance).
@@ -39,6 +41,9 @@ pas** son extracteur général de symboles — ses trois extracteurs sont étroi
   primitives + chaque `.tsx`. Requiert `tree-sitter` (extra `[ts]`).
 - **`routes.jsonl`** — `{var, path, full_path, component, parent, file, line}` depuis le router.
   Requiert `tree-sitter`.
+- **`usage.jsonl`** — `{consumer, kind, primitives, tokens, route}` : index **inverse** de consommation
+  (qui importe quelle primitive du barrel, quels tokens littéraux, sous quelle route). **Pur-Python** —
+  marche sans `tree-sitter` (seul le lien `route` se dégrade à `null`).
 
 ## Principes
 

@@ -10,6 +10,8 @@ Sous-commandes :
   primitive <name>         détail d'une primitive (props, variantes, defaults)
   routes                   arbre des routes
   where <intention>        « quelle primitive / quel token pour X ? » (ranking lexical borné)
+  usage <name>             « qui consomme cette primitive / ce token ? » (index inversé)
+  consumers <file>         ce qu'un écran consomme (primitives + tokens + route)
   check                    cohérence + fraîcheur de l'index
 """
 from __future__ import annotations
@@ -70,6 +72,18 @@ def _cmd_where(a: argparse.Namespace) -> int:
     return _emit(query.where(index_dir, a.intent, top_k=a.top_k))
 
 
+def _cmd_usage(a: argparse.Namespace) -> int:
+    from frontmap import query
+    _, index_dir, _ = _resolve(a.root)
+    return _emit(query.usage(index_dir, a.name))
+
+
+def _cmd_consumers(a: argparse.Namespace) -> int:
+    from frontmap import query
+    _, index_dir, _ = _resolve(a.root)
+    return _emit(query.consumers(index_dir, a.file))
+
+
 def _cmd_check(a: argparse.Namespace) -> int:
     from frontmap import query
     root, index_dir, cfg = _resolve(a.root)
@@ -107,6 +121,14 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("intent")
     w.add_argument("--top-k", type=int, default=5)
     w.set_defaults(func=_cmd_where)
+
+    u = sub.add_parser("usage", parents=[common], help="qui consomme cette primitive/ce token")
+    u.add_argument("name")
+    u.set_defaults(func=_cmd_usage)
+
+    cn = sub.add_parser("consumers", parents=[common], help="ce qu'un écran consomme")
+    cn.add_argument("file")
+    cn.set_defaults(func=_cmd_consumers)
 
     c = sub.add_parser("check", parents=[common], help="cohérence + fraîcheur de l'index")
     c.set_defaults(func=_cmd_check)

@@ -30,3 +30,16 @@ def test_build_still_produces_tokens_and_check_flags_absence(tmp_path, cfg, monk
     chk = query.check(tmp_path, FIXTURES, cfg)
     assert chk["ts_available"] is False
     assert any("tree-sitter" in f for f in chk["findings"])
+
+
+def test_usage_still_works_without_treesitter(tmp_path, cfg, monkeypatch):
+    # usage est PUR-Python (barrel + imports en regex) → produit même sans tree-sitter ; seul le lien
+    # route se dégrade à None (routes vide).
+    _force_no_treesitter(monkeypatch)
+    res = build(FIXTURES, tmp_path, cfg)
+    assert res["counts"]["usage"] > 0
+    assert query.usage(tmp_path, "Button")["count"] >= 2   # Home + Workspace
+
+    home = query.consumers(tmp_path, "Home.tsx")["consumer"]
+    assert "Button" in home["primitives"]
+    assert home["route"] is None                            # non résolu sans tree-sitter

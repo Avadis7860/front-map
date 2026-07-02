@@ -42,6 +42,18 @@ def parse_barrel(barrel_text: str) -> list[dict]:
     return out
 
 
+def primitive_names(root: Path, barrel_file: str) -> set[str]:
+    """Noms canoniques des primitives, lus du barrel par REGEX (aucune dépendance tree-sitter).
+
+    Voulu pour `usage` : la liste des primitives ne doit PAS dépendre de tree-sitter (le barrel est
+    déjà parsé par regex) — sinon la détection de consommation s'effondrerait sans l'extra `[ts]`."""
+    root = Path(root)
+    bpath = root / barrel_file
+    if not bpath.is_file():
+        return set()
+    return {e["name"] for e in parse_barrel(bpath.read_text(encoding="utf-8"))}
+
+
 def resolve_tsx(barrel_file: str, module: str) -> str:
     """Chemin POSIX relatif du `.tsx` d'une primitive, résolu depuis le dossier du barrel."""
     base = Path(barrel_file).parent

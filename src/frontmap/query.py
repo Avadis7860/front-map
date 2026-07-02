@@ -8,7 +8,9 @@ Jumeau de `code-map/query.py` (D7 : `build` d'abord, `query` lit). Chaque verbe 
   primitive <name>    → primitives.jsonl (détail : props, variantes, defaults)
   routes              → routes.jsonl (arbre)
   where <intention>   → ranking lexical sur primitives + tokens (« quelle primitive/token pour X ? »)
-  check               → cohérence + fraîcheur (barrel↔fichiers, index périmé, tree-sitter présent)
+  usage <name>        → usage.jsonl inversé (« qui consomme cette primitive/ce token ? »)
+  consumers <file>    → usage.jsonl (ce qu'un écran consomme : primitives + tokens + route)
+  check               → cohérence + fraîcheur (barrel↔fichiers, index périmé, tree-sitter, primitives mortes)
 """
 from __future__ import annotations
 
@@ -77,6 +79,33 @@ def where(index_dir: Path, intent: str, *, top_k: int = 5) -> dict:
     return {"results": hits[:top_k], "engine": ENGINE}
 
 
+def _consumer_ref(r: dict) -> dict:
+    """Vue courte d'un consommateur (pour l'index inversé)."""
+    return {"consumer": r["consumer"], "kind": r["kind"], "route": r["route"]}
+
+
+def usage(index_dir: Path, name: str) -> dict:
+    """Index INVERSE : « qui consomme `name` ? » — primitive (nom, insensible à la casse) ou token (exact)."""
+    rows = _load(index_dir, "usage.jsonl")
+    lname = name.lower()
+    as_primitive = [_consumer_ref(r) for r in rows if any(p.lower() == lname for p in r["primitives"])]
+    as_token = [_consumer_ref(r) for r in rows if name in r["tokens"]]
+    return {"target": name, "as_primitive": as_primitive, "as_token": as_token,
+            "count": len(as_primitive) + len(as_token), "engine": ENGINE}
+
+
+def consumers(index_dir: Path, file: str) -> dict:
+    """Ce qu'un écran consomme (primitives + tokens + route). Match par chemin rel exact ou basename."""
+    rows = _load(index_dir, "usage.jsonl")
+    rec = next((r for r in rows if r["consumer"] == file
+                or r["consumer"].endswith(f"/{file}")
+                or Path(r["consumer"]).name == file), None)
+    if rec is None:
+        return {"error": f"consommateur inconnu : {file}",
+                "available": [r["consumer"] for r in rows], "engine": ENGINE}
+    return {"consumer": rec, "engine": ENGINE}
+
+
 def check(index_dir: Path, root: Path, cfg: Config) -> dict:
     """Cohérence/fraîcheur : tree-sitter présent, index frais (hash), barrel↔.tsx résolus."""
     index_dir, root = Path(index_dir), Path(root)
@@ -117,5 +146,17 @@ def check(index_dir: Path, root: Path, cfg: Config) -> dict:
         ok = False
         findings.append(f"barrel de primitives introuvable : {cfg.primitives_barrel}")
 
+    # SIGNAUX (n'invalident pas `ok`) : primitives déclarées mais jamais consommées (candidates au retrait,
+    # ou juste neuves). front-map SIGNALE — il ne juge pas (le verdict est l'affaire du futur agent UX).
+    signals: list[str] = []
+    prim_rows = _load(index_dir, "primitives.jsonl")
+    usage_rows = _load(index_dir, "usage.jsonl")
+    if prim_rows:
+        consumed = {p for r in usage_rows for p in r["primitives"]}
+        dead = sorted(p["name"] for p in prim_rows if p["name"] not in consumed)
+        if dead:
+            signals.append(f"primitives jamais consommées : {', '.join(dead)}")
+
     return {"ok": ok and fresh, "ts_available": ts_ok, "fresh": fresh,
-            "counts": manifest.get("counts", {}), "findings": findings, "engine": ENGINE}
+            "counts": manifest.get("counts", {}), "findings": findings, "signals": signals,
+            "engine": ENGINE}

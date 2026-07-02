@@ -4,7 +4,8 @@
 
 Modéliser le **design-system réel** d'un projet front en un index **déterministe et interrogeable par un
 agent**, pour que la génération d'UI s'ancre sur la vérité (« quelle primitive existe pour X ? quel token
-de couleur ? quelle route rend cette vue ? ») plutôt que sur du code écrit en aveugle.
+de couleur ? quelle route rend cette vue ? **qui consomme cette primitive ?** ») plutôt que sur du code
+écrit en aveugle.
 
 ## Frontière avec code-map (verrouillée)
 
@@ -19,19 +20,25 @@ sémantique que code-map ne fait pas. Il :
 - **vendorise** le moteur *public* `tree-sitter` (même extra `[ts]` que code-map) et une **copie** du socle
   stdlib `core/` (`hashing`, `jsonl`, `roots`, `text`) ;
 - **ne dépend PAS** de code-map à l'exécution, ne lit pas son index ;
-- **ne re-duplique PAS** l'extracteur général de symboles (`symindex`) : ses trois extracteurs sont
-  **étroits et purpose-built** (tokens CSS, primitives DS, routes).
+- **ne re-duplique PAS** l'extracteur général de symboles (`symindex`) : ses quatre extracteurs sont
+  **étroits et purpose-built** (tokens CSS, primitives DS, routes, usage).
+
+La couche **`usage`** (« qui consomme quoi ») illustre la frontière : ce n'est **pas** un graphe d'imports
+général (ça, c'est code-map), mais un index **inverse** sur le vocabulaire *déjà connu de front-map* (ses
+primitives, ses tokens). Elle re-parse les imports en interne (regex, comme le barrel) — donc pur-Python,
+sans dépendre de code-map ni de tree-sitter.
 
 Deux outils, deux vocabulaires de requête, deux évolutions → deux repos.
 
 ## Couches
 
 ```
-cli.py ──────────► build.py ──────► extractors/{tokens,primitives,routes}.py ──► *.jsonl (index)
+cli.py ──────────► build.py ──────► extractors/{tokens,primitives,routes,usage}.py ──► *.jsonl (index)
    │                  ▲                         │
    │ (build écrit)    │ fraîcheur par hash      │ tokens : CSS pur (stdlib)
    │                  │ (frontmap.manifest.json)│ primitives/routes : tsparse.py (tree-sitter, best-effort)
-   └── query.py ──────┴─────────────────────────┘  (query LIT seulement)
+   └── query.py ──────┴─────────────────────────┘  usage : imports+tokens en regex (pur-Python)
+                                                    (query LIT seulement)
 ```
 
 - **`build`** est la SEULE couche qui exécute les extracteurs et matérialise les index. Idempotent : si
@@ -48,6 +55,10 @@ cli.py ──────────► build.py ──────► extracto
   defaults:{prop:valeur}, lead}`. `variants` = props dont le type est une union de littéraux string.
 - **`routes.jsonl`** — `{var, path, full_path, component, parent, is_root, file, line}`. `full_path`
   reconstruit en chaînant les `getParentRoute`.
+- **`usage.jsonl`** — `{consumer, kind:page|component, primitives:[…], tokens:[…], route}`. Un fichier par
+  consommateur du DS (fichier sans aucune primitive/token connu → omis). `primitives` = primitives connues
+  importées du barrel ; `tokens` = tokens connus référencés littéralement (`var(--…)`, best-effort — pas la
+  forme utilitaire Tailwind) ; `route` = `full_path` si le fichier est le composant d'une route, sinon `null`.
 - **`frontmap.manifest.json`** — `{contract_version, ts_available, counts, file_hashes}`. Base de la
   fraîcheur (hash de contenu ; la signature `ts_available` invalide la réutilisation quand tree-sitter
   apparaît/disparaît).
@@ -62,4 +73,8 @@ Aucune config obligatoire : les trois sources ont des défauts calés sur les co
 ## Dégradation gracieuse
 
 tree-sitter absent → `primitives`/`routes` vides (jamais d'exception) ; `tokens` (CSS pur) reste produit.
-`check` **signale** l'absence et l'éventuelle péremption de l'index (pas de faux-vert silencieux).
+`usage` reste produit lui aussi (pur-Python : primitives via le barrel-regex, tokens via scan littéral) —
+seul son `route` se dégrade à `null` (routes vide). `check` **signale** l'absence de tree-sitter, la
+péremption de l'index (pas de faux-vert silencieux) et, en `signals` (sans invalider `ok`), les primitives
+déclarées mais **jamais consommées** — front-map *signale*, il ne juge pas (le verdict est l'affaire du
+futur agent UX-critic).
