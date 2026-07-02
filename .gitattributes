@@ -1,0 +1,10 @@
+# Déterminisme multi-OS de l'index incrémental (hash de fraîcheur par contenu).
+# Le texte hashé est lu en newline-universel (LF) ; on force LF au checkout pour que le MÊME fichier
+# produise le MÊME hash sur WSL, Debian et macOS, quel que soit le git core.autocrlf de la machine.
+* text=auto eol=lf
+
+# Les index dérivés JSONL sont toujours LF (contrat de schéma inter-repos).
+*.jsonl text eol=lf
+
+# Fixtures binaires éventuelles : jamais de conversion.
+*.png binary

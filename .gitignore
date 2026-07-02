@@ -1,0 +1,37 @@
+# ============================================================
+# Python package
+# ============================================================
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# ============================================================
+# Index front-map (sous <repo>/.frontmap/) — cache local reconstructible → JAMAIS versionné
+# (tokens.jsonl / primitives.jsonl / routes.jsonl + manifest de fraîcheur)
+# ============================================================
+.frontmap/
+
+# ============================================================
+# Claude — bundle committé (CLAUDE.md + .claude/) ; état LOCAL ignoré
+# ============================================================
+.claude/settings.local.json
+.claude/*.local.json
+
+# ============================================================
+# Env / éditeurs / OS
+# ============================================================
+.env
+.env.*
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
