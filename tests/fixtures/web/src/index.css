@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────
+   Tokens — design-system d'échantillon (fixture). Valeurs fictives.
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  --font-sans: system-ui, sans-serif;
+
+  /* Surfaces */
+  --color-bg: #0a0f1a;
+  --color-surface: #111a2b;
+  --color-fg: #e7eef8;
+
+  /* Accent de marque */
+  --color-accent-400: #3cb4a4;
+  --color-accent-500: #2a9d8f;
+
+  /* Teintes de statut */
+  --color-ok-500: #22a06b;
+  --color-danger-500: #dc5a5a;
+
+  --radius-card: 0.625rem;          /* commentaire inline à ignorer */
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.4);
+  --animate-enter: enter 180ms ease;
+}
+
+/* Échelle z-index nommée */
+:root {
+  --z-header: 30;
+  --z-overlay: 60;
+}

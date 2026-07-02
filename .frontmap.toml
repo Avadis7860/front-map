@@ -1,0 +1,17 @@
+# .frontmap.toml — configuration d'un repo cible (échantillon commenté / valeurs = défauts).
+#
+# Ce fichier vit à la RACINE du repo dont front-map indexe le design-system. Sans lui, front-map
+# applique les conventions cockpit (web/ Vite+React). Les flags CLI (`--root`) le complètent.
+#
+# NB : ce repo-ci (front-map, un outil Python) n'a pas de web/ à indexer — ce fichier sert d'exemple
+# et de repère de racine (roots.project_root). L'usage réel est de le poser dans un repo front cible.
+
+[sources]
+# Fichier des design tokens (bloc @theme + :root). Parse CSS pur, toujours disponible.
+tokens = "web/src/index.css"
+
+# Barrel des primitives partagées : ses exports de valeur = la liste canonique des primitives.
+primitives_barrel = "web/src/components/ui/index.ts"
+
+# Définition des routes (TanStack Router code-based).
+router = "web/src/router.tsx"

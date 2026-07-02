@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "front-map"
+version = "0.1.0"
+description = "Index design-system déterministe et interrogeable par un agent (tokens + primitives + routes) — jumeau front de code-map, prêt à injecter dans un prompt worker."
+readme = "README.md"
+requires-python = ">=3.11"  # tomllib stdlib (config .frontmap.toml sans dépendance)
+license = { file = "LICENSE" }
+authors = [{ name = "AvAgency", email = "contact@avagency.pro" }]
+keywords = ["front-map", "design-system", "design-tokens", "tree-sitter", "tsx", "prompt-context"]
+# Le cœur (tokens CSS) est stdlib-pur : aucune dépendance obligatoire → installable partout, offline.
+dependencies = []
+
+[project.optional-dependencies]
+# Extraction TSX (primitives + routes). Roues pré-compilées → pas de toolchain C requise.
+# Absente = dégradation gracieuse (primitives/routes vides, jamais d'erreur ; les tokens restent).
+ts = ["tree-sitter>=0.21", "tree-sitter-typescript>=0.21"]
+dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10", "tree-sitter>=0.21", "tree-sitter-typescript>=0.21"]
+
+[project.scripts]
+frontmap = "frontmap.cli:main"
+
+[project.urls]
+Repository = "https://github.com/Avadis7860/front-map"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/frontmap"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["frontmap"]
+mypy_path = "src"
+ignore_missing_imports = true  # tree-sitter est optionnel + typé de façon lâche
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+# Les fixtures contiennent un mini web/ d'échantillon (index.css, .tsx) qui NE sont PAS des tests —
+# on lit ces fichiers, on ne les collecte pas.
+norecursedirs = ["fixtures"]
