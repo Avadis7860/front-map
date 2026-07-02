@@ -1,51 +1,48 @@
-# CLAUDE.md — front-map (index design-system déterministe)
+# CLAUDE.md — front-map (index design-system déterministe, jumeau front de code-map)
 
-> Lu au début de **chaque** session opérant dans ce repo. Persona `tool-builder` active. Cadre
-> **verrouillé** ci-dessous — ne pas re-débattre ; livrer. Outil du framework *cockpit* (repos frères :
-> `cockpit`, `code-map`, `mcp-catalogs`).
+> Lu au début de **chaque** session dans ce repo. Persona `tool-builder`.
+> Ce fichier = **règles + index + outils**, PAS la spec. Le détail (mission, cadre verrouillé, schéma,
+> frontière) vit dans `docs/` — lis-le, ne le recopie pas ici.
 
-## 1. Mission
+## Règles (non négociables)
 
-Un **CLI déterministe** qui transforme le `web/` d'un projet en index interrogeables — **tokens**,
-**primitives**, **routes** — pour répondre à « quelle primitive / quel token / quelle route pour X »
-**sans coder l'UI en aveugle**. Injecté dans chaque projet géré par le cockpit : un worker (ou un agent
-UX-critic) interroge le design-system **réel** avant d'écrire une vue.
-
-**Succès (binaire)** : `pip install -e '.[ts]'` puis `frontmap build --root <repo front>` →
-`primitive Button` sort ses variantes/props, `tokens accent` les tokens accent, `routes` l'arbre, `where`
-classe la bonne primitive ; deux builds sur sources inchangées → **skip idempotent** (fraîcheur par hash).
-
-## 2. Framework VERROUILLÉ (ne pas re-choisir)
-
-- **Python ≥ 3.11, cœur stdlib-pur** (`re`, `argparse`, `tomllib`, `pathlib`, `hashlib`) — **zéro
-  dépendance obligatoire**. L'extraction **TSX** (primitives + routes) = **extra optionnel** `[ts]`
-  (tree-sitter, roues pré-compilées) à **dégradation gracieuse** (absent → vides, jamais une erreur ; les
-  **tokens CSS** restent, eux, toujours disponibles).
-- **Jumeau de code-map, pas un fork** : on **vendorise** le moteur public tree-sitter + le socle stdlib
-  `core/` (copie) ; on **ne dépend PAS** de code-map à l'exécution et on **ne re-duplique PAS** son
-  extracteur général de symboles. front-map modélise ce que code-map ne modélise pas (la sémantique DS).
-- **Package installable** (src-layout, hatchling), **un CLI unifié** `frontmap`. `build` écrit / `query` lit.
-- **Pas de serveur, pas de MCP** : un outil local déterministe. Fichiers JSONL + CLI.
-- **Générique par configuration** (`.frontmap.toml`), **aucun chemin en dur** (défauts = conventions cockpit).
-- **Multi-OS** : chemins POSIX, `eol=lf`, hash newline-universel → index déterministe.
-
-## 3. Comment travailler ici
-
-- **Les docs sont la spec** : lis `docs/architecture.md` **avant** de coder. Le schéma des 3 index JSONL
-  est un **contrat** — on change un *extracteur*, pas un *schéma* (sinon : bump + note).
+- **Boucle de travail** : tout changement passe par le skill **`work-loop`** — worktree `feature/<sujet>`
+  créée **depuis `dev`**, gate vert, puis `dev` en ff-only. **`main` ne se travaille jamais** : il n'avance
+  que promu depuis un `dev` vert. Jamais de commit direct sur `main`/`dev`.
+- **Gate avant merge** : `ruff` + `mypy` + `pytest` + **idempotence** (skip sur sources inchangées) **verts**
+  (skill `quality-gate`). Un acte irréversible (merge/destroy) = **feu vert humain, fail-closed**.
+- **Anti-boucle** : pas de type de nœud tree-sitter inventé — le code de `tsparse.py` et de
+  `code-map/engines/typescript_ts.py` est la référence. MCP `vault-catalogs` best-effort s'il est branché.
 - **Anti-archéologie** : quand `frontmap` est fonctionnel sur un repo, interroge-le
-  (`primitives/tokens/routes/where`) au lieu de grep le front.
-- **Anti-boucle** : avant une API tree-sitter non triviale, le code de `tsparse.py` et
-  `code-map/engines/typescript_ts.py` sont la référence — n'invente pas de type de nœud.
-- **Qualité = gate** : `ruff` + `mypy` + `pytest` **verts** avant tout commit. Le déterminisme se **teste**
-  (skip idempotent). Fixtures minuscules, mini `web/` d'échantillon (jamais un vrai fichier d'un projet réel).
-- **Git** : branche `feature/<sujet>` depuis `dev`, jamais de commit direct sur `main`/`dev`.
+  (`primitives`/`tokens`/`routes`/`usage`/`where`/`consumers`/`detect`) au lieu de grep le front.
+- **Invariants du cœur** (détail dans `docs/architecture.md`) : cœur **stdlib-pur** (`re`/`tomllib`/`pathlib`
+  — aucune dép obligatoire ; extraction **TSX** = extra `[ts]` tree-sitter à **dégradation gracieuse**, les
+  **tokens CSS** restent toujours produits) · **jumeau de code-map, pas un fork** : vendorise le moteur
+  *public* tree-sitter + une **copie** du socle `core/`, **ne dépend PAS** de code-map à l'exécution, **ne
+  re-duplique PAS** son extracteur de symboles (front-map modélise la sémantique DS que code-map ne modélise
+  pas) · **générique par adaptateurs** (router `tanstack`|`react-router` × primitives `barrel`|`dir-scan`,
+  auto-détectés) au **schéma JSONL figé** · **fraîcheur par hash** (jamais mtime) · **jamais de cap
+  silencieux** (dégradation signalée par `check`) · **rien de spécifique-projet en dur** (`.frontmap.toml`).
+- Fixtures minuscules, mini `web/` d'échantillon (**jamais** un vrai fichier d'un projet réel).
 
-## 4. Anti-patterns (à ne jamais faire)
+## Index (la spec — lis-la avant de coder)
 
-- ❌ Ajouter une **dépendance obligatoire** au cœur (il reste stdlib-pur ; tree-sitter = extra optionnel).
-- ❌ **Dépendre de code-map** à l'exécution, ou y re-copier son extracteur de symboles (frontière verrouillée).
-- ❌ Changer un **schéma JSONL** sans bump + note (contrat inter-repos, consommé par le cockpit).
-- ❌ Inventer une signature d'API « de mémoire » au lieu de lire le code / la stdlib.
-- ❌ **Cap silencieux** : toute dégradation (tree-sitter absent, fichier introuvable) se **signale** (`check`).
-- ❌ Juger la fraîcheur au **mtime** — toujours **par hash de contenu**.
+- `docs/architecture.md` — intention, les 4 extracteurs (tokens/primitives/routes/usage), le **modèle
+  d'adaptateurs** (2 axes orthogonaux), la **frontière verrouillée** vis-à-vis de code-map, le CLI.
+
+## Outils à disposition (embarqués dans ce repo)
+
+- **Skills** (`.claude/skills/`) : `work-loop` (boucle de travail sûre, lightweight, sans cockpit) ·
+  `quality-gate` (ruff + mypy + pytest + idempotence) · `port-tool` (ajout de module au schéma figé).
+- **Hook** (`.claude/hooks/post-edit-check.py`) : `py_compile` + `ruff` sur le `.py` touché à chaque édition.
+- **Persona** (`.claude/output-styles/tool-builder.md`) : posture outilleur déterministe.
+- **Auto-carte** : `frontmap primitives/tokens/routes/usage/consumers/detect/check` sur un repo front.
+- **Doc tierce** : MCP `vault-catalogs` (`query_catalog` scopé, `read_doc`) s'il est branché.
+
+## Rapport au cockpit (auto-travaillable seul)
+
+Ce repo est **auto-travaillable en autonomie légère** : un clone GitHub suffit pour qu'un worker — IA
+`claude` **ou** humain — le fasse évoluer en sûreté via `work-loop`, **sans aucun centre de contrôle**. Le
+**cockpit** (forge : dispatch multi-projet, DB, gate, web) **automatise** exactement cette boucle par-dessus ;
+il est **optionnel**, jamais requis. Les invariants sont les **mêmes des deux côtés** : travail sur worktree
+`feature` depuis `dev`, gate vert avant merge, `main` protégé, **GO humain sur tout acte irréversible**.
