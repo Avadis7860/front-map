@@ -20,6 +20,11 @@ venv/
 .frontmap/
 
 # ============================================================
+# Index docs-map (sous <repo>/.docsmap/) — carte de doc dérivée, bâtie au setup, jamais versionnée
+# ============================================================
+.docsmap/
+
+# ============================================================
 # Claude — bundle committé (CLAUDE.md + .claude/) ; état LOCAL ignoré
 # ============================================================
 .claude/settings.local.json

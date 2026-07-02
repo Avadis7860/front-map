@@ -2,7 +2,7 @@
 
 > Lu au début de **chaque** session dans ce repo. Persona `tool-builder`.
 > Ce fichier = **règles + index + outils**, PAS la spec. Le détail (mission, cadre verrouillé, schéma,
-> frontière) vit dans `docs/` — lis-le, ne le recopie pas ici.
+> frontière) vit dans `docs/` — **interroge-le** (`docsmap where`), ne le recopie pas ici.
 
 ## Règles (non négociables)
 
@@ -14,7 +14,8 @@
 - **Anti-boucle** : pas de type de nœud tree-sitter inventé — le code de `tsparse.py` et de
   `code-map/engines/typescript_ts.py` est la référence. MCP `vault-catalogs` best-effort s'il est branché.
 - **Anti-archéologie** : quand `frontmap` est fonctionnel sur un repo, interroge-le
-  (`primitives`/`tokens`/`routes`/`usage`/`where`/`consumers`/`detect`) au lieu de grep le front.
+  (`primitives`/`tokens`/`routes`/`usage`/`where`/`consumers`/`detect`) au lieu de grep le front ; et la
+  prose de `docs/` se requête via `docsmap where`, jamais lue en bloc pour s'orienter.
 - **Invariants du cœur** (détail dans `docs/architecture.md`) : cœur **stdlib-pur** (`re`/`tomllib`/`pathlib`
   — aucune dép obligatoire ; extraction **TSX** = extra `[ts]` tree-sitter à **dégradation gracieuse**, les
   **tokens CSS** restent toujours produits) · **jumeau de code-map, pas un fork** : vendorise le moteur
@@ -25,7 +26,17 @@
   silencieux** (dégradation signalée par `check`) · **rien de spécifique-projet en dur** (`.frontmap.toml`).
 - Fixtures minuscules, mini `web/` d'échantillon (**jamais** un vrai fichier d'un projet réel).
 
-## Index (la spec — lis-la avant de coder)
+## Index (interroge, ne lis pas en bloc)
+
+La spec vit dans `docs/`. **Ne la lis pas en bloc pour t'orienter** — `docs-map` (injecté, zéro-dép) répond
+à l'intention ; lis ensuite **seulement** la tranche `fichier:lignes` renvoyée :
+
+```
+docsmap where "<intention>"     # → docs/…:lignes de la section pertinente
+docsmap sections                # table des matières
+```
+
+Ce que couvre la doc (cibles de `docsmap where`) :
 
 - `docs/architecture.md` — intention, les 4 extracteurs (tokens/primitives/routes/usage), le **modèle
   d'adaptateurs** (2 axes orthogonaux), la **frontière verrouillée** vis-à-vis de code-map, le CLI.
@@ -37,6 +48,7 @@
 - **Hook** (`.claude/hooks/post-edit-check.py`) : `py_compile` + `ruff` sur le `.py` touché à chaque édition.
 - **Persona** (`.claude/output-styles/tool-builder.md`) : posture outilleur déterministe.
 - **Auto-carte** : `frontmap primitives/tokens/routes/usage/consumers/detect/check` sur un repo front.
+- **Carte de doc** : `docsmap where/sections/read/check` sur la prose `docs/` de ce repo (injecté, zéro-dép).
 - **Doc tierce** : MCP `vault-catalogs` (`query_catalog` scopé, `read_doc`) s'il est branché.
 
 ## Rapport au cockpit (auto-travaillable seul)
