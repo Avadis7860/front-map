@@ -136,14 +136,28 @@ def _component(root_node, data: bytes, name: str):
     return default_fn
 
 
+def defaults_from_text(text: str) -> dict[str, str]:
+    """Défauts `k = 'v'` d'un texte de params/pattern destructuré (best-effort). Partagé TSX/Astro : côté
+    TSX ce sont les paramètres du composant, côté Astro l'object_pattern de `const {…} = Astro.props`."""
+    return {k: v.strip("'\"`") for k, v in _DEFAULT.findall(text)}
+
+
+def props_and_variants(root_node, data: bytes, name: str) -> tuple[list[dict], dict[str, list[str]]]:
+    """Props + variantes (props typées par une union de littéraux) d'une AST TS. Partagé : `detail` (TSX)
+    et `astro_component` (frontmatter d'un `.astro`) — même syntaxe `interface *Props` + unions."""
+    props = _props(root_node, data, name)
+    unions = _union_types(root_node, data)
+    variants = {p["name"]: unions[p["type"]] for p in props if p["type"] in unions}
+    return props, variants
+
+
 def _defaults(comp_node, data: bytes) -> dict[str, str]:
     if comp_node is None:
         return {}
     params = tsparse.field(comp_node, "parameters")
     if params is None:
         return {}
-    text = tsparse.node_text(data, params)
-    return {k: v.strip("'\"`") for k, v in _DEFAULT.findall(text)}
+    return defaults_from_text(tsparse.node_text(data, params))
 
 
 def detail(root: Path, tsx_rel: str, name: str) -> dict:
@@ -155,10 +169,8 @@ def detail(root: Path, tsx_rel: str, name: str) -> dict:
     if parsed is None:
         return dict(_EMPTY)
     root_node, data = parsed
-    props = _props(root_node, data, name)
+    props, variants = props_and_variants(root_node, data, name)
     comp = _component(root_node, data, name)
-    unions = _union_types(root_node, data)
-    variants = {p["name"]: unions[p["type"]] for p in props if p["type"] in unions}
     line = (comp.start_point[0] + 1) if comp is not None else 1
     lead = tsparse.lead_comment(data, tsparse.unwrap_export(comp)) if comp is not None else ""
     return {"props": props, "variants": variants, "defaults": _defaults(comp, data),

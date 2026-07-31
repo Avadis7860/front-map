@@ -15,7 +15,7 @@ CONFIG_FILENAME = ".frontmap.toml"
 INDEX_DIRNAME = ".frontmap"  # index dérivés sous <root>/.frontmap/ (jumeau de code-map .codemap/)
 
 ROUTER_FLAVORS = ("auto", "tanstack", "react-router")
-PRIMITIVES_SOURCES = ("auto", "barrel", "dir-scan")
+PRIMITIVES_SOURCES = ("auto", "barrel", "dir-scan", "astro")
 
 
 @dataclass(frozen=True)

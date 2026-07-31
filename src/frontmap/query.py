@@ -107,10 +107,12 @@ def consumers(index_dir: Path, file: str) -> dict:
 
 
 def check(index_dir: Path, root: Path, cfg: Config) -> dict:
-    """Cohérence/fraîcheur : tree-sitter présent, index frais (hash), source de primitives résolue.
+    """Cohérence/fraîcheur : tree-sitter présent, index frais (hash), source de primitives résolue + parsable.
 
-    Générique par convention : la source des primitives (barrel OU dossier) et sa complétude sont vérifiées
-    via l'adaptateur résolu ; les limites du router (routes dynamiques) remontent en `signals`."""
+    Générique par convention : la source des primitives (barrel, dossier `.tsx` ou `.astro`), sa complétude ET
+    sa **parsabilité** sont vérifiées via l'adaptateur résolu → `primitives_status` (`verified`|`names_only`|
+    `unavailable`) : jamais faux-vert sur une source que la convention ne sait pas parser. Les limites du
+    router (routes dynamiques) remontent en `signals`."""
     index_dir, root = Path(index_dir), Path(root)
     router = resolve_router(root, cfg)
     prim = resolve_primitives(root, cfg)
@@ -122,9 +124,22 @@ def check(index_dir: Path, root: Path, cfg: Config) -> dict:
     if not ts_ok:
         findings.append("tree-sitter absent → primitives/routes vides (installer l'extra `[ts]`)")
 
+    # Statut TYPÉ de la source de primitives (indépendant de la fraîcheur) — garantit qu'un `check` ne se lit
+    # jamais faux-vert sur une source que la convention ne sait pas parser (ex. `.astro` sans `[astro]`) :
+    #   verified    = source présente ET grammaire de détail chargeable → catalogue vérifié
+    #   names_only  = source présente mais grammaire absente → noms connus, détail vide, NON vérifié (≠ vert)
+    #   unavailable = source introuvable (convention/config qui ne pointe rien)
+    if not prim.available(root, cfg):
+        primitives_status = "unavailable"
+    elif not prim.detail_parser_available():
+        primitives_status = "names_only"
+    else:
+        primitives_status = "verified"
+
     if not man_path.is_file():
         return {"ok": False, "ts_available": ts_ok, "fresh": False,
                 "conventions": {"router": router.name, "primitives": prim.name},
+                "primitives_status": primitives_status,
                 "findings": ["index absent — lancer `frontmap build`"], "signals": [], "engine": ENGINE}
 
     try:
@@ -139,11 +154,16 @@ def check(index_dir: Path, root: Path, cfg: Config) -> dict:
         ok = False
         findings.append("index périmé (sources, dispo tree-sitter ou convention changée) — rebuild")
 
-    # source des primitives résolue + complète (barrel↔.tsx pour la convention barrel ; toujours OK pour
-    # dir-scan où la source EST le fichier)
-    if not prim.available(root, cfg):
+    # source des primitives résolue + complète + PARSABLE (cf. `primitives_status`). Un `names_only` (source
+    # présente mais grammaire de détail absente) est un rouge HONNÊTE — distinct d'« introuvable » : le
+    # catalogue existe mais n'a pas pu être vérifié, on ne le présente pas comme vert.
+    if primitives_status == "unavailable":
         ok = False
         findings.append(f"source de primitives ({prim.name}) introuvable")
+    elif primitives_status == "names_only":
+        ok = False
+        findings.append(f"catalogue « {prim.name} » NON vérifié : grammaire de détail absente "
+                        f"(noms seuls, détail vide) — installer l'extra requis")
     for miss in prim.missing_files(root, cfg):
         ok = False
         findings.append(f"primitive « {miss} » : fichier introuvable")
@@ -160,5 +180,6 @@ def check(index_dir: Path, root: Path, cfg: Config) -> dict:
 
     return {"ok": ok and fresh, "ts_available": ts_ok, "fresh": fresh,
             "conventions": {"router": router.name, "primitives": prim.name},
+            "primitives_status": primitives_status,
             "counts": manifest.get("counts", {}), "findings": findings, "signals": signals,
             "engine": ENGINE}

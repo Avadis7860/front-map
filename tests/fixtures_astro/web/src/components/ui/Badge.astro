@@ -1,0 +1,10 @@
+---
+type Tone = 'ok' | 'warn' | 'danger';
+
+interface Props {
+  tone?: Tone;
+  label: string;
+}
+const { tone = 'ok', label } = Astro.props;
+---
+<span class:list={['badge', `badge-${tone}`]}>{label}</span>

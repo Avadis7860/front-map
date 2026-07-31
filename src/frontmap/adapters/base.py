@@ -63,11 +63,14 @@ class RouterAdapter(Protocol):
 class PrimitivesAdapter(Protocol):
     """Catalogue des primitives + détection de leur consommation, pour UNE convention d'exposition.
 
-    `name` : clé (`barrel` | `dir-scan`). `primitive_names` est le **contrat pivot** (regex, SANS
-    tree-sitter → `usage` marche sans `[ts]`). `consumed_primitives` encapsule la façon dont CETTE
-    convention importe une primitive (nommé depuis un barrel, ou défaut depuis un fichier). `ui_dir` =
-    dossier des primitives (exclu du scan des consommateurs). `missing_files` = primitives déclarées dont
-    le fichier manque (pour `check` ; vide quand la source EST le fichier, cf. dir-scan)."""
+    `name` : clé (`barrel` | `dir-scan` | `astro`). `primitive_names` est le **contrat pivot** (regex/
+    filesystem, SANS tree-sitter → `usage` marche sans les extras). `consumed_primitives` encapsule la façon
+    dont CETTE convention importe une primitive (nommé depuis un barrel, ou défaut depuis un fichier).
+    `ui_dir` = dossier des primitives (exclu du scan des consommateurs). `missing_files` = primitives
+    déclarées dont le fichier manque (pour `check` ; vide quand la source EST le fichier, cf. dir-scan/astro).
+    `detail_parser_available` = la grammaire tree-sitter dont CETTE convention a besoin pour le détail riche
+    est-elle chargeable ? (`[ts]` pour barrel/dir-scan ; `[astro]` + `[ts]` pour astro) → `check` distingue
+    « vérifié » de « noms seuls » sans jamais se lire faux-vert sur une source qu'il ne sait pas parser."""
 
     name: str
 
@@ -75,6 +78,7 @@ class PrimitivesAdapter(Protocol):
     def primitive_names(self, root: Path, cfg: Config) -> set[str]: ...
     def referenced_files(self, root: Path, cfg: Config) -> list[str]: ...
     def ui_dir(self, root: Path, cfg: Config) -> str: ...
+    def detail_parser_available(self) -> bool: ...
     def consumed_primitives(self, text: str, importer_rel: str, cfg: Config,
                             names: set[str]) -> list[str]: ...
     def extract_primitives(self, root: Path, cfg: Config) -> list[PrimitiveRow]: ...

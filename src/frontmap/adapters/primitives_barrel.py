@@ -60,6 +60,9 @@ class BarrelPrimitives:
     def ui_dir(self, root: Path, cfg: Config) -> str:
         return Path(cfg.primitives_barrel).parent.as_posix()
 
+    def detail_parser_available(self) -> bool:
+        return tsparse.available()  # détail riche (props/variants) = grammaire TS/TSX (extra `[ts]`)
+
     def referenced_files(self, root: Path, cfg: Config) -> list[str]:
         bpath = Path(root) / cfg.primitives_barrel
         if not bpath.is_file():

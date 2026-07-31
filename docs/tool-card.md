@@ -6,8 +6,8 @@ Un CLI **autonome, déterministe** (frère de code-map) qui lit le `web/` d'un p
 JSONL : **tokens · primitives · routes · usage**. Là où code-map répond « où est le code / qui appelle quoi »,
 front-map répond « **quelle primitive / quel token / quelle route pour X** » — il modélise la *sémantique du
 design-system* que code-map ne voit pas (pour lui, `Button` n'est qu'une fonction anonyme). Générique par
-**convention auto-détectée** (router `tanstack`/`react-router`, primitives `barrel`/`dir-scan`) ; un axe
-inconnu dégrade gracieusement et le signale.
+**convention auto-détectée** (router `tanstack`/`react-router`, primitives `barrel`/`dir-scan`/`astro`) ; un
+axe inconnu dégrade gracieusement et le signale.
 
 ## Pourquoi l'utiliser avec Claude
 

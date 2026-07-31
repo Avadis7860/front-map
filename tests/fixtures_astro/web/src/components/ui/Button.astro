@@ -1,0 +1,14 @@
+---
+type Variant = 'primary' | 'secondary';
+type Size = 'sm' | 'lg';
+
+interface Props {
+  variant?: Variant;
+  size?: Size;
+  disabled?: boolean;
+}
+const { variant = 'primary', size = 'sm', disabled = false } = Astro.props;
+---
+<button class:list={['btn', `btn-${variant}`, `btn-${size}`]} disabled={disabled}>
+  <slot />
+</button>

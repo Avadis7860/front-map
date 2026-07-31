@@ -11,7 +11,7 @@ dur** — tout passe par la config.
 Dataclass **frozen**. Sources : `tokens_file`, `primitives_barrel`, `primitives_dir`, `router_file`,
 `web_root`, `import_alias` (défauts = conventions cockpit : `web/` Vite+React+TanStack+barrel). **Axes de
 convention** : `router_flavor` (`auto|tanstack|react-router`) et `primitives_source` (`auto|barrel|
-dir-scan`) — `"auto"` → détection depuis le code (`adapters.detect_*`) ; un `.frontmap.toml` peut forcer.
+dir-scan|astro`) — `"auto"` → détection depuis le code (`adapters.detect_*`) ; un `.frontmap.toml` peut forcer.
 Immuable → une config chargée ne dérive pas.
 
 ## Config.load() — .frontmap.toml → Config (ou défauts)

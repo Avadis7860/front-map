@@ -22,7 +22,7 @@ pas** son extracteur général de symboles — ses quatre extracteurs sont étro
 **Générique par convention (comme code-map est multi-langage).** Là où code-map varie par *langage* via
 des *engines*, front-map varie par *convention* via des **adaptateurs** sur deux axes orthogonaux :
 - **router** : `tanstack` (TanStack code-based `createRoute`) · `react-router` (JSX `<Route>`) ;
-- **primitives** : `barrel` (`components/ui/index.ts` ré-exporte) · `dir-scan` (un `.tsx` par primitive, sans barrel).
+- **primitives** : `barrel` (`components/ui/index.ts` ré-exporte) · `dir-scan` (un `.tsx` par primitive, sans barrel) · `astro` (un `.astro` par primitive, détail lu dans le frontmatter).
 
 La convention est **auto-détectée** (sniff des imports du router, présence d'un barrel) — ou forcée dans
 `.frontmap.toml`. Un axe inconnu dégrade gracieusement et le signale ; ajouter une convention = un nouvel
@@ -48,8 +48,10 @@ adaptateur dans le registre (`src/frontmap/adapters/`), rien d'autre ne bouge.
 - **`tokens.jsonl`** — `{name, value, group, source_file, line}` depuis le CSS (`@theme` + `:root`).
   **CSS pur, toujours disponible** (aucune dépendance).
 - **`primitives.jsonl`** — `{name, file, line, props, variants, defaults, lead}` depuis l'adaptateur
-  primitives résolu (barrel **ou** dir-scan). Le catalogue **riche** requiert `tree-sitter` (extra `[ts]`) ;
-  les **noms** (contrat pivot pour `usage`) sont extraits sans (regex/filesystem).
+  primitives résolu (barrel, dir-scan **ou** astro). Le catalogue **riche** requiert `tree-sitter` (extra
+  `[ts]`), et pour la convention `astro` aussi la grammaire astro (extra `[astro]`) ; les **noms** (contrat
+  pivot pour `usage`) sont extraits sans (regex/filesystem). `frontmap check` porte un statut typé
+  `primitives_status` (`verified` | `names_only` | `unavailable`) → jamais faux-vert sur une source non parsable.
 - **`routes.jsonl`** — `{var, path, full_path, component, parent, is_root, file, line}` depuis l'adaptateur
   router résolu (tanstack **ou** react-router). Requiert `tree-sitter`.
 - **`usage.jsonl`** — `{consumer, kind, primitives, tokens, route}` : index **inverse** de consommation
@@ -67,8 +69,8 @@ adaptateur dans le registre (`src/frontmap/adapters/`), rien d'autre ne bouge.
   n'ont pas bougé. Déterministe cross-OS (newlines normalisées).
 - **Générique par convention** : sources + axes (router / primitives) se déclarent dans un
   [`.frontmap.toml`](./.frontmap.toml) à la racine du repo cible (défauts = conventions cockpit,
-  convention auto-détectée). Prouvé sur deux projets réels aux conventions opposées (cockpit TanStack+barrel,
-  aggregator react-router+dir-scan).
+  convention auto-détectée). Prouvé sur trois projets réels aux conventions opposées (cockpit TanStack+barrel,
+  aggregator react-router+dir-scan, vitrine Astro).
 
 ## Installation
 

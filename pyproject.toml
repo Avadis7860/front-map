@@ -18,7 +18,12 @@ dependencies = []
 # Extraction TSX (primitives + routes). Roues pré-compilées → pas de toolchain C requise.
 # Absente = dégradation gracieuse (primitives/routes vides, jamais d'erreur ; les tokens restent).
 ts = ["tree-sitter>=0.21", "tree-sitter-typescript>=0.21"]
-dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10", "tree-sitter>=0.21", "tree-sitter-typescript>=0.21"]
+# Extraction des primitives Astro (frontmatter `.astro`). Pas de wheel `tree-sitter-astro` autonome sur PyPI →
+# la grammaire vient, pré-compilée, du language-pack. Requiert AUSSI `[ts]` (le frontmatter est du TS re-parsé).
+# Absente = dégradation gracieuse signalée par `check` (noms connus, détail vide, statut `names_only` ≠ vert).
+astro = ["tree-sitter-language-pack>=1.13", "tree-sitter>=0.21", "tree-sitter-typescript>=0.21"]
+dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10", "tree-sitter>=0.21", "tree-sitter-typescript>=0.21",
+       "tree-sitter-language-pack>=1.13"]
 
 [project.scripts]
 frontmap = "frontmap.cli:main"

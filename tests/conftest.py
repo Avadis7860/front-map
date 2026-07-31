@@ -9,6 +9,7 @@ from frontmap.config import Config
 
 FIXTURES = Path(__file__).parent / "fixtures"          # projet 1 : TanStack + barrel (convention cockpit)
 RR = Path(__file__).parent / "fixtures_rr"             # projet 2 : react-router + dir-scan
+ASTRO = Path(__file__).parent / "fixtures_astro"       # projet 3 : primitives Astro (frontmatter `.astro`)
 BARREL = "web/src/components/ui/index.ts"
 TOKENS = "web/src/index.css"
 ROUTER = "web/src/router.tsx"
@@ -32,3 +33,13 @@ def rr_root() -> Path:
 @pytest.fixture
 def cfg_rr() -> Config:
     return Config()  # mêmes défauts ; l'auto-détection résout react-router + dir-scan sur l'arbre rr-app
+
+
+@pytest.fixture
+def astro_root() -> Path:
+    return ASTRO
+
+
+@pytest.fixture
+def cfg_astro() -> Config:
+    return Config()  # mêmes défauts ; l'auto-détection résout la convention `astro` sur l'arbre astro

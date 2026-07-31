@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from frontmap.adapters.base import PrimitivesAdapter, RouterAdapter
+from frontmap.adapters.primitives_astro import AstroPrimitives
 from frontmap.adapters.primitives_barrel import BarrelPrimitives
 from frontmap.adapters.primitives_dirscan import DirScanPrimitives
 from frontmap.adapters.router_react import ReactRouter
@@ -24,7 +25,7 @@ def router_registry() -> dict[str, RouterAdapter]:
 
 
 def primitives_registry() -> dict[str, PrimitivesAdapter]:
-    return {"barrel": BarrelPrimitives(), "dir-scan": DirScanPrimitives()}
+    return {"barrel": BarrelPrimitives(), "dir-scan": DirScanPrimitives(), "astro": AstroPrimitives()}
 
 
 def detect_router(root: Path, cfg: Config) -> str:
@@ -40,11 +41,15 @@ def detect_router(root: Path, cfg: Config) -> str:
 
 
 def detect_primitives(root: Path, cfg: Config) -> str:
-    """`barrel` si le barrel existe ; sinon `dir-scan` si le dossier a des `.tsx` ; sinon `barrel`."""
+    """`barrel` si le barrel existe ; sinon `dir-scan` si le dossier a des `.tsx` ; sinon `astro` si le
+    dossier a des `.astro` ; sinon `barrel`. L'ordre préserve les projets TSX (barrel/dir-scan gardent la
+    priorité) ; astro n'est retenu que sur un dossier réellement Astro."""
     if (Path(root) / cfg.primitives_barrel).is_file():
         return "barrel"
     if DirScanPrimitives().available(root, cfg):
         return "dir-scan"
+    if AstroPrimitives().available(root, cfg):
+        return "astro"
     return "barrel"
 
 
