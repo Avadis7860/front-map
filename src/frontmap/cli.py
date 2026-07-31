@@ -19,17 +19,63 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from frontmap import __version__
 from frontmap.config import INDEX_DIRNAME, Config
 from frontmap.core import roots
 
+_borrow_warned = False
 
-def _resolve(root_opt: str | None) -> tuple[Path, Path, Config]:
-    """Résout (racine, dossier d'index, config) pour toute sous-commande."""
+
+def _sentinel() -> str:
+    """Marqueur « un build a réellement tourné » : le manifest — la même constante que `check` interroge
+    déjà, pas une sentinelle neuve. Import **paresseux** (`frontmap.build` tire les adaptateurs et
+    tree-sitter : `--help` n'a pas à les charger) et **sans duplication**, donc rien qui puisse dériver."""
+    from frontmap.build import MANIFEST_NAME
+    return MANIFEST_NAME
+
+
+def _warn_borrow(main_root: Path) -> None:
+    """Annonce l'emprunt d'index sur **stderr** — le JSON de stdout n'est pas touché (un consommateur qui
+    parse la sortie ne doit pas voir apparaître un champ pour une information d'ergonomie CLI ; c'est aussi
+    ce qu'a tranché code-map, dont l'enveloppe est un contrat versionné). Invariant maison respecté : jamais
+    de cap silencieux, toute borne se signale.
+
+    Émis **une seule fois par invocation** de `main()` (qui remet le drapeau à zéro) : `main()` re-résout
+    pour sa garde `needs_index`, le message sortirait sinon en double."""
+    global _borrow_warned
+    if _borrow_warned:
+        return
+    _borrow_warned = True
+    print(f"⚠ index emprunté au répertoire principal ({main_root})", file=sys.stderr)
+    print("  → ne voit pas le code de cette worktree ; `frontmap build` pour l'à-jour", file=sys.stderr)
+
+
+def _resolve(root_opt: str | None, *, borrow: bool = False) -> tuple[Path, Path, Config]:
+    """Résout (racine, dossier d'index, config) pour toute sous-commande.
+
+    `borrow=True` (verbes de **lecture** seulement) : dans une worktree liée SANS index propre — les index
+    dérivés ne sont pas versionnés, `git worktree add` ne les emporte donc pas — on lit celui du répertoire
+    de travail principal plutôt que de laisser l'appelant fouiller le front à l'aveugle. L'emprunt s'annonce
+    sur stderr (fraîcheur : l'index du principal ignore le code de la worktree).
+
+    Deux exclusions **délibérées**, toutes deux par le même critère « que fait ce verbe de `index_dir` ? » :
+
+    - `build` **écrit** — emprunter reviendrait à écrire l'index de la feature dans le répertoire principal
+      (corruption silencieuse de celui de `dev`). Le critère est l'écriture, jamais le nom du verbe.
+    - `check` **diagnostique l'index local** — répondre avec celui du principal transformerait « tu n'as pas
+      d'index ici » en verdict vert sur l'index d'un autre. Il porte déjà son `ok:false` honnête.
+    """
     root = roots.project_root(root_opt)
-    return root, root / INDEX_DIRNAME, Config.load(root)
+    index_dir = root / INDEX_DIRNAME
+    if borrow and not (index_dir / _sentinel()).is_file():
+        main_root = roots.main_worktree_root(root)
+        if main_root is not None and (main_root / INDEX_DIRNAME / _sentinel()).is_file():
+            _warn_borrow(main_root)
+            index_dir = main_root / INDEX_DIRNAME
+    return root, index_dir, Config.load(root)
 
 
 def _emit(data: dict) -> int:
@@ -39,49 +85,52 @@ def _emit(data: dict) -> int:
 
 def _cmd_build(a: argparse.Namespace) -> int:
     from frontmap import build as build_mod
+
+    # PAS d'emprunt : `build` ÉCRIT dans `index_dir`. Emprunter y écrirait l'index de cette worktree dans
+    # le répertoire principal — la corruption exacte que la garde vise.
     root, index_dir, cfg = _resolve(a.root)
     return _emit(build_mod.build(root, index_dir, cfg, force=a.force))
 
 
 def _cmd_tokens(a: argparse.Namespace) -> int:
     from frontmap import query
-    _, index_dir, _ = _resolve(a.root)
+    _, index_dir, _ = _resolve(a.root, borrow=True)
     return _emit(query.tokens(index_dir, a.group))
 
 
 def _cmd_primitives(a: argparse.Namespace) -> int:
     from frontmap import query
-    _, index_dir, _ = _resolve(a.root)
+    _, index_dir, _ = _resolve(a.root, borrow=True)
     return _emit(query.primitives(index_dir))
 
 
 def _cmd_primitive(a: argparse.Namespace) -> int:
     from frontmap import query
-    _, index_dir, _ = _resolve(a.root)
+    _, index_dir, _ = _resolve(a.root, borrow=True)
     return _emit(query.primitive(index_dir, a.name))
 
 
 def _cmd_routes(a: argparse.Namespace) -> int:
     from frontmap import query
-    _, index_dir, _ = _resolve(a.root)
+    _, index_dir, _ = _resolve(a.root, borrow=True)
     return _emit(query.routes(index_dir))
 
 
 def _cmd_where(a: argparse.Namespace) -> int:
     from frontmap import query
-    _, index_dir, _ = _resolve(a.root)
+    _, index_dir, _ = _resolve(a.root, borrow=True)
     return _emit(query.where(index_dir, a.intent, top_k=a.top_k))
 
 
 def _cmd_usage(a: argparse.Namespace) -> int:
     from frontmap import query
-    _, index_dir, _ = _resolve(a.root)
+    _, index_dir, _ = _resolve(a.root, borrow=True)
     return _emit(query.usage(index_dir, a.name))
 
 
 def _cmd_consumers(a: argparse.Namespace) -> int:
     from frontmap import query
-    _, index_dir, _ = _resolve(a.root)
+    _, index_dir, _ = _resolve(a.root, borrow=True)
     return _emit(query.consumers(index_dir, a.file))
 
 
@@ -93,6 +142,10 @@ def _cmd_detect(a: argparse.Namespace) -> int:
 
 def _cmd_check(a: argparse.Namespace) -> int:
     from frontmap import query
+
+    # PAS d'emprunt (ni de garde `needs_index`) : `check` est le diagnostic de l'index LOCAL. Répondre avec
+    # celui du principal changerait de sujet — « tu n'as pas d'index ici » deviendrait un verdict vert sur
+    # l'index d'un autre. Il porte déjà son `ok:false` « index absent » honnête.
     root, index_dir, cfg = _resolve(a.root)
     res = query.check(index_dir, root, cfg)
     _emit(res)
@@ -110,32 +163,35 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--force", action="store_true", help="ignore le skip d'idempotence")
     b.set_defaults(func=_cmd_build)
 
+    # `needs_index=True` marque les verbes de LECTURE : ils exigent un index déjà bâti. `main()` les garde
+    # (message actionnable si l'index manque) — vs `build`, qui le bâtit, et `detect`/`check`, qui n'en
+    # dépendent pas (`detect` lit les sources ; `check` diagnostique l'absence lui-même).
     t = sub.add_parser("tokens", parents=[common], help="design tokens")
     t.add_argument("--group", help="filtre par groupe (accent|status|surface|radius|shadow|motion|z|…)")
-    t.set_defaults(func=_cmd_tokens)
+    t.set_defaults(func=_cmd_tokens, needs_index=True)
 
     ps = sub.add_parser("primitives", parents=[common], help="catalogue des primitives")
-    ps.set_defaults(func=_cmd_primitives)
+    ps.set_defaults(func=_cmd_primitives, needs_index=True)
 
     p = sub.add_parser("primitive", parents=[common], help="détail d'une primitive")
     p.add_argument("name")
-    p.set_defaults(func=_cmd_primitive)
+    p.set_defaults(func=_cmd_primitive, needs_index=True)
 
     r = sub.add_parser("routes", parents=[common], help="arbre des routes")
-    r.set_defaults(func=_cmd_routes)
+    r.set_defaults(func=_cmd_routes, needs_index=True)
 
     w = sub.add_parser("where", parents=[common], help="quelle primitive/token pour une intention")
     w.add_argument("intent")
     w.add_argument("--top-k", type=int, default=5)
-    w.set_defaults(func=_cmd_where)
+    w.set_defaults(func=_cmd_where, needs_index=True)
 
     u = sub.add_parser("usage", parents=[common], help="qui consomme cette primitive/ce token")
     u.add_argument("name")
-    u.set_defaults(func=_cmd_usage)
+    u.set_defaults(func=_cmd_usage, needs_index=True)
 
     cn = sub.add_parser("consumers", parents=[common], help="ce qu'un écran consomme")
     cn.add_argument("file")
-    cn.set_defaults(func=_cmd_consumers)
+    cn.set_defaults(func=_cmd_consumers, needs_index=True)
 
     dt = sub.add_parser("detect", parents=[common], help="conventions auto-détectées (router / primitives)")
     dt.set_defaults(func=_cmd_detect)
@@ -147,8 +203,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    global _borrow_warned
+    _borrow_warned = False  # état par INVOCATION (et non par processus) : `main()` rappelé en test/in-process
     ap = build_parser()
     a = ap.parse_args(argv)
+    # Garde index-absent pour les verbes de lecture : sans elle, `tokens`/`primitives`/`routes`/… renvoient
+    # un vide TROMPEUR (`read_jsonl` rend `[]` sur fichier absent → `{"tokens": [], "count": 0}`, rc 0 :
+    # impossible de distinguer « pas de token » de « pas d'index »). On dégrade proprement : même forme que
+    # `check`, message actionnable, rc inchangé. Le manifest est le marqueur « un build a tourné ».
+    if getattr(a, "needs_index", False):
+        _, index_dir, _ = _resolve(a.root, borrow=True)
+        if not (index_dir / _sentinel()).is_file():
+            from frontmap.query import ENGINE
+            return _emit({"ok": False, "reason": "index absent — lance `frontmap build`", "engine": ENGINE})
     return a.func(a)
 
 
