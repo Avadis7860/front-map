@@ -22,8 +22,10 @@
   *public* tree-sitter + une **copie** du socle `core/`, **ne dépend PAS** de code-map à l'exécution, **ne
   re-duplique PAS** son extracteur de symboles (front-map modélise la sémantique DS que code-map ne modélise
   pas) · **générique par adaptateurs** (router `tanstack`|`react-router` × primitives `barrel`|`dir-scan`,
-  auto-détectés) au **schéma JSONL figé** · **fraîcheur par hash** (jamais mtime) · **jamais de cap
-  silencieux** (dégradation signalée par `check`) · **rien de spécifique-projet en dur** (`.frontmap.toml`).
+  auto-détectés) au **schéma JSONL figé** (on change un *moteur*, pas un *schéma* → sinon bump de
+  `CONTRACT_VERSION` **+ entrée de `CHANGELOG.md`**, comme chez les deux jumeaux) · **fraîcheur par hash**
+  (jamais mtime) · **jamais de cap silencieux** (dégradation signalée par `check`) · **rien de
+  spécifique-projet en dur** (`.frontmap.toml`).
 - Fixtures minuscules, mini `web/` d'échantillon (**jamais** un vrai fichier d'un projet réel).
 
 ## Index (interroge, ne lis pas en bloc)
