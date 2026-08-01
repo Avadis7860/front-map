@@ -49,7 +49,10 @@ Autorité = `components/ui/index.ts` qui ré-exporte (`export { Button } from '.
 extrait les exports de **valeur** (les `type X` ignorés) ; `primitive_names` = leurs noms (regex, sans
 TS). `consumed_primitives` suit les imports **nommés** vers le dossier du barrel. `extract_primitives`
 enrichit via `tsx_component.detail` (vide sans tree-sitter). `missing_files` = primitive déclarée dont le
-`.tsx` manque. Convention du nouveau cockpit (TanStack).
+`.tsx` manque. `detail_parser_available` dit si la grammaire de détail est chargeable — c'est lui que
+`query.check` interroge pour trancher entre `verified` et `names_only` : sans grammaire, on connaît les
+noms mais pas les props/variants, et le catalogue ne doit pas se lire comme vérifié. Convention du
+nouveau cockpit (TanStack).
 
 ## DirScanPrimitives — convention dir-scan
 

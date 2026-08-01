@@ -54,8 +54,14 @@ Entrées : `index_dir, file` (chemin rel exact, suffixe `/file`, ou basename). R
 Re-hache les sources et compare au manifest ; vérifie tree-sitter présent, convention résolue et source
 de primitives complète (`prim.available` / `prim.missing_files`). `findings` invalident `ok` (index
 périmé, source absente) ; **`signals`** n'invalident PAS (routes dynamiques via `router.signals`,
-primitives jamais consommées) — front-map **signale**, le verdict revient au futur agent UX. Sortie
-`{ok, ts_available, fresh, conventions, counts, findings, signals, engine}`.
+primitives jamais consommées) — front-map **signale**, le verdict revient au futur agent UX.
+Un troisième registre, **`primitives_status`**, dit la qualité de ce qu'on sait de la source de primitives,
+indépendamment de sa fraîcheur : `verified` (source présente ET grammaire de détail chargeable → catalogue
+vérifié), `names_only` (source présente mais grammaire absente → les noms sont connus, le détail est vide,
+et ce n'est donc **pas** un vert), `unavailable` (source introuvable). C'est la garde anti faux-vert de la
+généricité par convention : une source `.astro` sans l'extra `[astro]` ne doit pas se lire comme un
+catalogue vérifié. Sortie
+`{ok, ts_available, fresh, conventions, primitives_status, counts, findings, signals, engine}`.
 
 ## Zones non détaillées
 
