@@ -61,7 +61,7 @@ fichier). `detail_parser_available` = `tsparse.available()`. Convention du web a
 
 ## AstroPrimitives — convention astro
 
-`src/frontmap/adapters/primitives_astro.py:27` (classe) ; `_is_primitive_file` `:19`.
+`src/frontmap/adapters/primitives_astro.py:27` (classe) ; `_is_primitive_file` `:22`.
 Autorité = le **dossier** `components/ui/` (`Button.astro` = primitive `Button`). Nom canonique = **stem**
 (filesystem, sans parseur → `primitive_names` marche sans extra). Le détail (props/variants/defaults) vient
 du **frontmatter** TS, extrait par `astro_component.detail` (grammaire astro pour délimiter, grammaire TS
