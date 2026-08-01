@@ -106,6 +106,44 @@ def consumers(index_dir: Path, file: str) -> dict:
     return {"consumer": rec, "engine": ENGINE}
 
 
+def freshness(index_dir: Path, root: Path, cfg: Config) -> dict:
+    """État de fraîcheur BRUT : re-hache les sources et compare au manifest. Sortie **interne**.
+
+    Sépare ce que `check` aplatit en un seul booléen `fresh`, parce que les causes ne coûtent pas la même
+    chose au lecteur : `unindexed` = le fichier est **absent** de toute réponse (un silence — c'est ainsi
+    qu'une primitive livrée reste invisible au catalogue), `drifted` = ce qui est servi pour lui est **faux**,
+    `removed` = l'index sert une primitive d'un fichier disparu. `ts_changed` / `conventions_changed`
+    n'accusent aucun fichier : l'index entier est bâti sur une autre hypothèse.
+
+    Rend `{ok, files, unindexed, drifted, removed, ts_changed, conventions_changed}`, ou `{ok:false, reason}`
+    si le manifest manque (**sans** clé `files` — c'est le discriminant des appelants).
+
+    `check` en est le formateur : un second calculateur de fraîcheur dériverait du premier.
+    """
+    man_path = Path(index_dir) / MANIFEST_NAME
+    if not man_path.is_file():
+        return {"ok": False, "reason": "index absent — lancer `frontmap build`", "engine": ENGINE}
+    try:
+        manifest = json.loads(man_path.read_text(encoding="utf-8"))
+    except ValueError:
+        manifest = {}                       # illisible ⇒ tout est « jamais indexé », jamais un faux vert
+    root = Path(root)
+    conventions = {"router": resolve_router(root, cfg).name,
+                   "primitives": resolve_primitives(root, cfg).name}
+    ts_ok = tsparse.available()
+    cur = {f: sha_text((root / f).read_text(encoding="utf-8", errors="replace"))
+           for f in source_files(root, cfg)}
+    old = manifest.get("file_hashes") or {}
+    unindexed = sorted(k for k in cur if k not in old)
+    drifted = sorted(k for k in cur if k in old and old[k] != cur[k])
+    removed = sorted(k for k in old if k not in cur)
+    ts_changed = manifest.get("ts_available") != ts_ok
+    conventions_changed = manifest.get("conventions") != conventions
+    return {"ok": not (unindexed or drifted or removed or ts_changed or conventions_changed),
+            "files": len(cur), "unindexed": unindexed, "drifted": drifted, "removed": removed,
+            "ts_changed": ts_changed, "conventions_changed": conventions_changed, "engine": ENGINE}
+
+
 def check(index_dir: Path, root: Path, cfg: Config) -> dict:
     """Cohérence/fraîcheur : tree-sitter présent, index frais (hash), source de primitives résolue + parsable.
 
@@ -142,17 +180,17 @@ def check(index_dir: Path, root: Path, cfg: Config) -> dict:
                 "primitives_status": primitives_status,
                 "findings": ["index absent — lancer `frontmap build`"], "signals": [], "engine": ENGINE}
 
-    try:
-        manifest = json.loads(man_path.read_text(encoding="utf-8"))
-    except ValueError:
-        manifest = {}
-    cur = {f: sha_text((root / f).read_text(encoding="utf-8", errors="replace"))
-           for f in source_files(root, cfg)}
-    fresh = (manifest.get("file_hashes") == cur and manifest.get("ts_available") == ts_ok
-             and manifest.get("conventions") == {"router": router.name, "primitives": prim.name})
+    # SOURCE UNIQUE de la fraîcheur : `freshness()` (dont ce verbe est le formateur). La sortie de `check`
+    # reste INCHANGÉE — schéma et signatures sont un contrat figé ; c'est le signal stderr des verbes de
+    # lecture (`cli._warn_stale`) qui exploite le détail par cause.
+    fresh = freshness(index_dir, root, cfg)["ok"]
     if not fresh:
         ok = False
         findings.append("index périmé (sources, dispo tree-sitter ou convention changée) — rebuild")
+    try:
+        manifest = json.loads(man_path.read_text(encoding="utf-8"))   # relu pour ses seuls `counts`
+    except ValueError:
+        manifest = {}
 
     # source des primitives résolue + complète + PARSABLE (cf. `primitives_status`). Un `names_only` (source
     # présente mais grammaire de détail absente) est un rouge HONNÊTE — distinct d'« introuvable » : le

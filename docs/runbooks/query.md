@@ -48,10 +48,25 @@ Répond « si je change ce token/cette primitive, qui casse ».
 Entrées : `index_dir, file` (chemin rel exact, suffixe `/file`, ou basename). Renvoie l'enregistrement
 `usage` du fichier (primitives + tokens + route) ou `{error, available}`.
 
+## freshness() — l'état de fraîcheur BRUT (sortie interne, source unique)
+
+`src/frontmap/query.py:109`.
+Re-hache les sources et compare au manifest. Sépare ce que `check` aplatit en un seul booléen `fresh`,
+parce que les causes ne coûtent pas la même chose au lecteur : `unindexed` = le fichier est **absent** de
+toute réponse (c'est ainsi qu'une primitive livrée reste invisible au catalogue), `drifted` = ce qui est
+servi pour lui est **faux**, `removed` = l'index sert une primitive d'un fichier disparu ; `ts_changed` et
+`conventions_changed` n'accusent aucun fichier — l'index entier repose sur une autre hypothèse.
+Rend `{ok, files, unindexed, drifted, removed, ts_changed, conventions_changed}`, ou `{ok:false, reason}`
+si le manifest manque (**sans** clé `files` — le discriminant des appelants).
+
+Deux consommateurs, un seul calcul : `check()` en est le **formateur** (sortie inchangée, contrat figé) et
+`cli._warn_stale` en exploite le détail par cause. Un second calculateur de fraîcheur dériverait du
+premier, et l'écart entre les deux deviendrait le prochain faux-vert.
+
 ## check() — cohérence + fraîcheur (SIGNALE, ne juge pas)
 
-`src/frontmap/query.py:109` · appelé par `cli._cmd_check`.
-Re-hache les sources et compare au manifest ; vérifie tree-sitter présent, convention résolue et source
+`src/frontmap/query.py:147` · appelé par `cli._cmd_check`.
+Formateur de `freshness()` ; vérifie en plus tree-sitter présent, convention résolue et source
 de primitives complète (`prim.available` / `prim.missing_files`). `findings` invalident `ok` (index
 périmé, source absente) ; **`signals`** n'invalident PAS (routes dynamiques via `router.signals`,
 primitives jamais consommées) — front-map **signale**, le verdict revient au futur agent UX.

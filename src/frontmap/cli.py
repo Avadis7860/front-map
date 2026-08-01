@@ -53,6 +53,53 @@ def _warn_borrow(main_root: Path) -> None:
     print("  → ne voit pas le code de cette worktree ; `frontmap build` pour l'à-jour", file=sys.stderr)
 
 
+_STALE_CAP = 5      # fichiers nommés par catégorie ; le reste est COMPTÉ, jamais tu (invariant maison)
+
+
+def _fmt_files(paths: list[str]) -> str:
+    """Liste bornée : au plus `_STALE_CAP` chemins, puis le compte du reste. Un cap qui ne s'annonce pas est
+    un mensonge par omission — même invariant que `check`, qui ne rend jamais un vert partiel."""
+    rest = len(paths) - _STALE_CAP
+    head = ", ".join(paths[:_STALE_CAP])
+    return f"{head} … +{rest} autre(s)" if rest > 0 else head
+
+
+def _warn_stale(fresh: dict) -> None:
+    """Annonce la péremption de l'index sur **stderr** — même contrat que `_warn_borrow` : le JSON de stdout
+    n'est pas touché.
+
+    POURQUOI AUX VERBES DE LECTURE et pas seulement dans `check` : `check` savait déjà tout, mais il n'est
+    prescrit nulle part dans la règle anti-archéologie — les agents lisent par `where`/`primitives`/`tokens`,
+    qui servaient leur catalogue avec l'autorité d'un index et **0 octet sur stderr**.
+
+    LE SPÉCIMEN QUI A MOTIVÉ CE SIGNAL (mesuré le 2026-08-01 sur le cockpit, index gelé au 07-25 alors que
+    `web/` avait bougé le 07-31) : `FileDrop.tsx` existait, exporté par le barrel et consommé par un écran ;
+    `frontmap primitives` en listait **16** sans lui, et `frontmap where "zone de dépôt de fichier"` rendait
+    `{"results": []}` — rc 0, stderr vide. Une session qui applique « ne réinvente pas un primitive existant,
+    `frontmap where` d'abord » recevait un **vide confiant** et réécrivait le composant. C'est la forme la
+    plus coûteuse du faux-vert : elle supprime le doute.
+
+    Porte sur l'**état de l'index**, pas sur la réponse rendue : un fichier jamais indexé n'apparaît dans
+    aucun hit — restreindre l'avertissement aux fichiers cités serait muet là où le silence est le plus
+    dangereux, c'est-à-dire exactement sur le spécimen ci-dessus.
+    """
+    if "files" not in fresh or fresh.get("ok"):     # index absent (déjà dit ailleurs) ou frais → silence
+        return
+    cats = (("∅", "jamais indexé(s)", fresh["unindexed"]),
+            ("≠", "modifié(s) depuis le build", fresh["drifted"]),
+            ("–", "disparu(s) du disque", fresh["removed"]))
+    resume = [f"{len(v)} {label}" for _, label, v in cats if v]
+    if fresh["ts_changed"]:
+        resume.append("dispo tree-sitter changée")
+    if fresh["conventions_changed"]:
+        resume.append("convention (router/primitives) changée")
+    print(f"⚠ index périmé — {', '.join(resume) or 'cause non détaillée'}", file=sys.stderr)
+    for sigil, _, v in cats:
+        if v:
+            print(f"  {sigil} {_fmt_files(v)}", file=sys.stderr)
+    print("  → `frontmap build` pour l'à-jour", file=sys.stderr)
+
+
 def _resolve(root_opt: str | None, *, borrow: bool = False) -> tuple[Path, Path, Config]:
     """Résout (racine, dossier d'index, config) pour toute sous-commande.
 
@@ -212,10 +259,19 @@ def main(argv=None) -> int:
     # impossible de distinguer « pas de token » de « pas d'index »). On dégrade proprement : même forme que
     # `check`, message actionnable, rc inchangé. Le manifest est le marqueur « un build a tourné ».
     if getattr(a, "needs_index", False):
-        _, index_dir, _ = _resolve(a.root, borrow=True)
+        root, index_dir, cfg = _resolve(a.root, borrow=True)
         if not (index_dir / _sentinel()).is_file():
             from frontmap.query import ENGINE
             return _emit({"ok": False, "reason": "index absent — lance `frontmap build`", "engine": ENGINE})
+        # Fraîcheur : un index périmé se servait en SILENCE (2026-08-01 — le cockpit servait un catalogue
+        # de 16 primitives amputé de `FileDrop`, livré 6 jours plus tôt). Point d'appel UNIQUE, ici :
+        # l'index est déjà résolu et les 7 verbes de lecture y passent tous.
+        # Index EMPRUNTÉ ⇒ on se tait : hacher le front de cette worktree contre le manifest du répertoire
+        # principal rendrait tout le diff de la feature « périmé », par-dessus un avertissement qui dit
+        # déjà exactement cela.
+        if not _borrow_warned:
+            from frontmap import query
+            _warn_stale(query.freshness(index_dir, root, cfg))
     return a.func(a)
 
 
