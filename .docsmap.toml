@@ -8,5 +8,6 @@ docs = "docs"
 # Motif des fichiers sous `docs` (récursif). Markdown seulement (carte de headings).
 glob = "**/*.md"
 
-# Markdown SUPPLÉMENTAIRE hors `docs` à inclure. Aucun ici (spec unique sous docs/).
-extra = []
+# Markdown SUPPLÉMENTAIRE hors `docs` à inclure : le README racine — la porte d'entrée du repo, hors
+# index jusqu'ici, donc invisible à `docsmap where` et jamais relue.
+extra = ["README.md"]

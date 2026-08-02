@@ -3,7 +3,7 @@
 > Index **design-system déterministe et interrogeable par un agent** (tokens · primitives · routes · usage)
 > — pour ancrer la génération d'UI sur un index plutôt que sur du code écrit en aveugle.
 
-**Statut : privé · v1.** Outil **autonome**, sans service ni réseau : un CLI déterministe qui lit le
+**Statut : privé · v1** (évolutions : [`CHANGELOG`](./CHANGELOG.md)). Outil **autonome**, sans service ni réseau : un CLI déterministe qui lit le
 `web/` d'un projet et écrit quatre index JSONL. Conçu pour être **injecté dans chaque projet géré** par le
 [`cockpit`](../cockpit) — un worker IA (ou un agent UX-critic) interroge la vérité du design-system **réel**
 avant d'écrire une vue, au lieu de réinventer un bouton ou de coder une couleur en dur.
@@ -67,6 +67,10 @@ adaptateur dans le registre (`src/frontmap/adapters/`), rien d'autre ne bouge.
   que lire. Aucune exécution lourde dans une requête.
 - **Fraîcheur par hash de contenu** (jamais mtime) : index incrémental, skip idempotent si les sources
   n'ont pas bougé. Déterministe cross-OS (newlines normalisées).
+- **Un catalogue périmé ne se sert jamais en silence** : chaque verbe de lecture émet sur **stderr** un
+  signal de péremption (`∅` jamais indexé · `≠` modifié depuis le build · `–` disparu du disque), sans
+  toucher au JSON de stdout — celui-ci est un contrat inter-consommateurs. Le vide honnête plutôt que la
+  réponse fausse : c'est le faux-positif qui coûte cher, parce qu'il supprime le doute.
 - **Générique par convention** : sources + axes (router / primitives) se déclarent dans un
   [`.frontmap.toml`](./.frontmap.toml) à la racine du repo cible (défauts = conventions cockpit,
   convention auto-détectée). Prouvé sur trois projets réels aux conventions opposées (cockpit TanStack+barrel,
