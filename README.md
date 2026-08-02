@@ -84,3 +84,10 @@ pip install -e '.[dev]'          # dev inclut tree-sitter (primitives + routes)
 frontmap build --root /chemin/vers/un/repo/front
 frontmap primitive Button --root /chemin/vers/un/repo/front
 ```
+## Licence
+
+**Apache-2.0** — voir [`LICENSE`](./LICENSE) et [`NOTICE`](./NOTICE).
+
+Installation, exécution, modification et redistribution sont accordées, y compris pour un usage
+commercial. La §6 ne concède aucun droit sur le **nom** ; la clause de brevets (§3) accorde les brevets
+nécessaires et se retire de plein droit contre qui attaque le projet en contrefaçon.
