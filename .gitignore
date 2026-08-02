@@ -40,3 +40,9 @@ venv/
 *.swp
 .DS_Store
 Thumbs.db
+
+# ============================================================
+# Index code-map (sous <repo>/.codemap/) — carte de code dérivée, bâtie par `codemap build`
+#   sur src/** → reconstructible, JAMAIS versionné (même doctrine que .docsmap/).
+# ============================================================
+.codemap/
