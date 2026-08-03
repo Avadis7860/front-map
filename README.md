@@ -1,93 +1,106 @@
 # front-map
 
-> Index **design-system déterministe et interrogeable par un agent** (tokens · primitives · routes · usage)
-> — pour ancrer la génération d'UI sur un index plutôt que sur du code écrit en aveugle.
+> A **deterministic, agent-queryable design-system index** (tokens · primitives · routes · usage)
+> — so UI generation is grounded in an index instead of code written blind.
 
-**Statut : v1** (évolutions : [`CHANGELOG`](./CHANGELOG.md)). Outil **autonome**, sans service ni réseau : un CLI déterministe qui lit le
-`web/` d'un projet et écrit quatre index JSONL. Conçu pour être **injecté dans chaque projet géré** par le
-`cockpit` — un worker IA (ou un agent UX-critic) interroge la vérité du design-system **réel**
-avant d'écrire une vue, au lieu de réinventer un bouton ou de coder une couleur en dur.
+**Status: v1** (changes: [`CHANGELOG`](./CHANGELOG.md)). A **standalone** CLI: no service, no network,
+no daemon. It reads a project's `web/` directory and writes four JSONL indexes. It is built to be dropped
+into any front-end repo an AI coding agent (or a UX review agent) works on, so the agent can query the
+**real** design system before writing a view — instead of reinventing a button or hardcoding a colour.
 
-## Pourquoi un outil séparé de [`code-map`](https://github.com/Avadis7860/code-map)
+## What this is *not*
 
-`code-map` répond **« où est le code / qui appelle quoi »** : il extrait des *symboles* bruts
-(`class/function/type/const`) et le graphe d'imports. Pour lui, `Button` n'est qu'un `kind:function`
-anonyme — il **ne modélise pas** la sémantique du design-system. `front-map` répond **« quelle primitive /
-quel token / quelle route pour X »** : il modélise ce que code-map ne fait pas.
+- **Not a component library.** It ships no components, no CSS, no runtime. It only describes yours.
+- **It does not generate UI.** Every verb is read-only except `build`, which writes only index files.
+- **Not a design-token compiler.** It reads tokens where they already live; it does not emit them.
+- **Not a general symbol index.** See [`code-map`](https://github.com/Avadis7860/code-map) for that.
+- **Not a linter or an accessibility checker.** `check` reports index consistency and a few structural
+  signals, never a quality verdict on your components.
 
-Frontière : front-map **vendorise le moteur *public* `tree-sitter`** (même extra optionnel que code-map)
-et une copie du socle stdlib `core/` ; il **ne dépend pas** de code-map à l'exécution et **ne re-duplique
-pas** son extracteur général de symboles — ses quatre extracteurs sont étroits et DS-sémantiques.
+## Why a separate tool from [`code-map`](https://github.com/Avadis7860/code-map)
 
-**Générique par convention (comme code-map est multi-langage).** Là où code-map varie par *langage* via
-des *engines*, front-map varie par *convention* via des **adaptateurs** sur deux axes orthogonaux :
-- **router** : `tanstack` (TanStack code-based `createRoute`) · `react-router` (JSX `<Route>`) ;
-- **primitives** : `barrel` (`components/ui/index.ts` ré-exporte) · `dir-scan` (un `.tsx` par primitive, sans barrel) · `astro` (un `.astro` par primitive, détail lu dans le frontmatter).
+`code-map` answers **"where is the code, who calls what"**: it extracts raw *symbols*
+(`class/function/type/const`) and the import graph. To it, `Button` is just an anonymous `kind:function` —
+it **does not model** design-system semantics. front-map answers **"which primitive, which token, which
+route for X"**: it models exactly what code-map does not.
 
-La convention est **auto-détectée** (sniff des imports du router, présence d'un barrel) — ou forcée dans
-`.frontmap.toml`. Un axe inconnu dégrade gracieusement et le signale ; ajouter une convention = un nouvel
-adaptateur dans le registre (`src/frontmap/adapters/`), rien d'autre ne bouge.
+The boundary: front-map vendors the *public* `tree-sitter` engine (the same optional extra code-map uses)
+plus a copy of the stdlib `core/` base; it **does not depend on code-map** at runtime and **does not
+duplicate** its general symbol extractor. Its four extractors are narrow and design-system-semantic.
 
-## Verbes
+**Generic by convention (the way code-map is generic by language).** Where code-map varies by *language*
+through *engines*, front-map varies by *convention* through **adapters**, along two orthogonal axes:
 
-| Verbe | Rôle |
+- **router**: `tanstack` (TanStack code-based `createRoute`) · `react-router` (JSX `<Route>`);
+- **primitives**: `barrel` (`components/ui/index.ts` re-exports) · `dir-scan` (one `.tsx` per primitive, no
+  barrel) · `astro` (one `.astro` per primitive, detail read from the frontmatter).
+
+The convention is **auto-detected** (sniffing the router's imports, looking for a barrel) — or forced in
+`.frontmap.toml`. An unknown axis degrades gracefully and says so; adding a convention means adding one
+adapter to the registry (`src/frontmap/adapters/`) and nothing else moves.
+
+## Verbs
+
+| Verb | Purpose |
 |---|---|
-| `frontmap build [--root R]` | (re)construit les 4 index, incrémental par hash |
-| `frontmap tokens [--group G]` | design tokens (filtre optionnel : accent/status/surface/radius/…) |
-| `frontmap primitives` | catalogue des primitives (résumé) |
-| `frontmap primitive <name>` | détail d'une primitive : props, variantes, defaults |
-| `frontmap routes` | arbre des routes (path → composant) |
-| `frontmap where <intention>` | « quelle primitive / quel token pour X ? » (ranking lexical borné) |
-| `frontmap usage <name>` | index **inversé** : « qui consomme cette primitive / ce token ? » |
-| `frontmap consumers <file>` | ce qu'un écran consomme : primitives + tokens + route |
-| `frontmap detect` | conventions auto-détectées du repo (router / primitives) |
-| `frontmap check` | cohérence + fraîcheur + signaux (routes dynamiques, primitives jamais consommées) |
+| `frontmap build [--root R]` | (re)build the 4 indexes, incremental by hash |
+| `frontmap tokens [--group G]` | design tokens (optional filter: accent/status/surface/radius/…) |
+| `frontmap primitives` | primitive catalogue (summary) |
+| `frontmap primitive <name>` | detail of one primitive: props, variants, defaults |
+| `frontmap routes` | route tree (path → component) |
+| `frontmap where <intent>` | "which primitive, which token for X?" (bounded lexical ranking) |
+| `frontmap usage <name>` | **inverted** index: "who consumes this primitive or token?" |
+| `frontmap consumers <file>` | what one screen consumes: primitives + tokens + route |
+| `frontmap detect` | conventions auto-detected in the repo (router / primitives) |
+| `frontmap check` | consistency, freshness and signals (dynamic routes, primitives never consumed) |
 
-## Les quatre index
+## The four indexes
 
-- **`tokens.jsonl`** — `{name, value, group, source_file, line}` depuis le CSS (`@theme` + `:root`).
-  **CSS pur, toujours disponible** (aucune dépendance).
-- **`primitives.jsonl`** — `{name, file, line, props, variants, defaults, lead}` depuis l'adaptateur
-  primitives résolu (barrel, dir-scan **ou** astro). Le catalogue **riche** requiert `tree-sitter` (extra
-  `[ts]`), et pour la convention `astro` aussi la grammaire astro (extra `[astro]`) ; les **noms** (contrat
-  pivot pour `usage`) sont extraits sans (regex/filesystem). `frontmap check` porte un statut typé
-  `primitives_status` (`verified` | `names_only` | `unavailable`) → jamais faux-vert sur une source non parsable.
-- **`routes.jsonl`** — `{var, path, full_path, component, parent, is_root, file, line}` depuis l'adaptateur
-  router résolu (tanstack **ou** react-router). Requiert `tree-sitter`.
-- **`usage.jsonl`** — `{consumer, kind, primitives, tokens, route}` : index **inverse** de consommation
-  (qui importe quelle primitive, quels tokens littéraux, sous quelle route). **Pur-Python** — marche sans
-  `tree-sitter` (seul le lien `route` se dégrade à `null`).
+- **`tokens.jsonl`** — `{name, value, group, source_file, line}` read from CSS (`@theme` + `:root`).
+  **Pure CSS, always available** (no dependency).
+- **`primitives.jsonl`** — `{name, file, line, props, variants, defaults, lead}` from the resolved
+  primitives adapter (barrel, dir-scan **or** astro). The **rich** catalogue needs `tree-sitter` (extra
+  `[ts]`), and for the `astro` convention also the astro grammar (extra `[astro]`); the **names** — the
+  pivot contract for `usage` — are extracted without either (regex plus filesystem). `frontmap check`
+  carries a typed `primitives_status` (`verified` | `names_only` | `unavailable`), so it is never falsely
+  green on a source it could not parse.
+- **`routes.jsonl`** — `{var, path, full_path, component, parent, is_root, file, line}` from the resolved
+  router adapter (tanstack **or** react-router). Requires `tree-sitter`.
+- **`usage.jsonl`** — `{consumer, kind, primitives, tokens, route}`: the **inverse** consumption index
+  (who imports which primitive, which literal tokens, under which route). **Pure Python** — it works
+  without `tree-sitter` (only the `route` link degrades to `null`).
 
-## Principes
+## Principles
 
-- **Cœur stdlib-pur** (tokens CSS) : installable partout, offline. Le **TSX** (via `tree-sitter`, roues
-  pré-compilées) est un **extra optionnel** ; absent → dégradation gracieuse (primitives/routes vides,
-  jamais d'erreur ; `check` le signale).
-- **`build` écrit / `query` lit** : `frontmap build` matérialise les index ; les autres verbes ne font
-  que lire. Aucune exécution lourde dans une requête.
-- **Fraîcheur par hash de contenu** (jamais mtime) : index incrémental, skip idempotent si les sources
-  n'ont pas bougé. Déterministe cross-OS (newlines normalisées).
-- **Un catalogue périmé ne se sert jamais en silence** : chaque verbe de lecture émet sur **stderr** un
-  signal de péremption (`∅` jamais indexé · `≠` modifié depuis le build · `–` disparu du disque), sans
-  toucher au JSON de stdout — celui-ci est un contrat inter-consommateurs. Le vide honnête plutôt que la
-  réponse fausse : c'est le faux-positif qui coûte cher, parce qu'il supprime le doute.
-- **Générique par convention** : sources + axes (router / primitives) se déclarent dans un
-  [`.frontmap.toml`](./.frontmap.toml) à la racine du repo cible (défauts = conventions cockpit,
-  convention auto-détectée). Prouvé sur trois projets réels aux conventions opposées (cockpit TanStack+barrel,
-  aggregator react-router+dir-scan, vitrine Astro).
+- **Stdlib-pure core** (CSS tokens): installs anywhere, offline. **TSX** support (via `tree-sitter`,
+  pre-built wheels) is an **optional extra**; when absent, primitives and routes come back empty and
+  `check` says so — it never errors out.
+- **`build` writes, queries read**: `frontmap build` materialises the indexes; every other verb only
+  reads. No heavy work hides inside a query.
+- **Freshness by content hash, never mtime**: the index is incremental and idempotent — unchanged sources
+  are skipped. Deterministic across operating systems (newlines normalised).
+- **A stale catalogue is never served silently**: every read verb emits a staleness signal on **stderr**
+  (`∅` never indexed · `≠` modified since the build · `–` gone from disk) without touching the JSON on
+  stdout, which is a contract for downstream consumers. An honest empty answer beats a wrong one: the
+  false positive is what costs, because it removes the doubt.
+- **Generic by convention**: sources and both axes (router / primitives) are declared in a
+  [`.frontmap.toml`](./.frontmap.toml) at the root of the target repo, with the convention auto-detected by
+  default. Proven on three real projects with opposite conventions: a dashboard (TanStack + barrel), an
+  aggregator (react-router + dir-scan) and a marketing site (Astro).
 
-## Installation
+## Install
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-pip install -e '.[dev]'          # dev inclut tree-sitter (primitives + routes)
-frontmap build --root /chemin/vers/un/repo/front
-frontmap primitive Button --root /chemin/vers/un/repo/front
+pip install -e '.[dev]'          # dev includes tree-sitter (primitives + routes)
+frontmap build --root /path/to/a/front-end/repo
+frontmap primitive Button --root /path/to/a/front-end/repo
 ```
+
 ## Licence
 
-**Apache-2.0** — voir [`LICENSE`](./LICENSE) et [`NOTICE`](./NOTICE).
+**Apache-2.0** — see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE).
 
-Installation, exécution, modification et redistribution sont accordées, y compris pour un usage
-commercial. La §6 ne concède aucun droit sur le **nom** ; la clause de brevets (§3) accorde les brevets
-nécessaires et se retire de plein droit contre qui attaque le projet en contrefaçon.
+Installation, use, modification and redistribution are granted, including for commercial use. Section 6
+grants no rights over the **name**; the patent clause (section 3) grants the patents needed to use the
+work and terminates automatically for anyone who sues the project for patent infringement.
