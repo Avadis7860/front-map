@@ -3,12 +3,12 @@
 > Index **design-system déterministe et interrogeable par un agent** (tokens · primitives · routes · usage)
 > — pour ancrer la génération d'UI sur un index plutôt que sur du code écrit en aveugle.
 
-**Statut : privé · v1** (évolutions : [`CHANGELOG`](./CHANGELOG.md)). Outil **autonome**, sans service ni réseau : un CLI déterministe qui lit le
+**Statut : v1** (évolutions : [`CHANGELOG`](./CHANGELOG.md)). Outil **autonome**, sans service ni réseau : un CLI déterministe qui lit le
 `web/` d'un projet et écrit quatre index JSONL. Conçu pour être **injecté dans chaque projet géré** par le
-[`cockpit`](../cockpit) — un worker IA (ou un agent UX-critic) interroge la vérité du design-system **réel**
+`cockpit` — un worker IA (ou un agent UX-critic) interroge la vérité du design-system **réel**
 avant d'écrire une vue, au lieu de réinventer un bouton ou de coder une couleur en dur.
 
-## Pourquoi un outil séparé de [`code-map`](../code-map)
+## Pourquoi un outil séparé de [`code-map`](https://github.com/Avadis7860/code-map)
 
 `code-map` répond **« où est le code / qui appelle quoi »** : il extrait des *symboles* bruts
 (`class/function/type/const`) et le graphe d'imports. Pour lui, `Button` n'est qu'un `kind:function`
